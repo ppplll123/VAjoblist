@@ -258,6 +258,9 @@ body {
 }
 .section-divider .line { flex: 1; height: 1px; background: var(--border); }
 
+/* ─── Mobile sort dropdown (hidden on desktop) ─── */
+.mobile-sort { display: none; }
+
 /* ─── Mobile inline tags (hidden on desktop) ─── */
 .mobile-tags { display: none; }
 
@@ -324,8 +327,16 @@ body {
   .action-btn { padding: 5px 10px; font-size: 10px; }
   .spacer { display: none; }
 
-  /* Column header — hide on mobile */
+  /* Column header — hide on mobile, show sort dropdown instead */
   .col-header { display: none; }
+  .mobile-sort {
+    display: block; appearance: none; -webkit-appearance: none;
+    background: var(--surface2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23777'/%3E%3C/svg%3E") no-repeat right 8px center;
+    border: 1px solid var(--border); color: var(--text);
+    padding: 5px 24px 5px 8px; border-radius: 5px;
+    font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500;
+    cursor: pointer; width: auto;
+  }
 
   /* Job rows — clean 2-column, no overflow */
   .job-list { padding: 0 0 80px; max-width: 100vw; overflow: hidden; }
@@ -375,7 +386,6 @@ body {
     </div>
     <div class="stats-bar">
       <div class="stat new-stat">New <b id="stat-new">0</b></div>
-      <div class="stat">VA <b id="stat-queue">0</b></div>
       <div class="stat" style="color:#0a66c2">EA <b id="stat-ea" style="color:#0a66c2">0</b></div>
       <div class="stat checked-stat">Done <b id="stat-applied">0</b></div>
       <div class="stat">Total <b id="stat-total">0</b></div>
@@ -388,14 +398,11 @@ body {
     <button class="tab ea-tab" data-tab="easy_apply">
       Easy Apply <span class="count" id="tab-ea-count">0</span>
     </button>
-    <button class="tab" data-tab="queue">
-      VA Queue <span class="count" id="tab-queue-count">0</span>
+    <button class="tab" data-tab="browse">
+      Browse <span class="count" id="tab-browse-count">0</span>
     </button>
     <button class="tab" data-tab="applied">
       Applied <span class="count" id="tab-applied-count">0</span>
-    </button>
-    <button class="tab" data-tab="browse">
-      Browse <span class="count" id="tab-browse-count">0</span>
     </button>
     <button class="tab" data-tab="all">
       All <span class="count" id="tab-all-count">0</span>
@@ -414,6 +421,14 @@ body {
   <button class="filter-btn" data-filter="easy_apply">Easy Apply</button>
   <button class="filter-btn" data-filter="external">External</button>
   <input class="search-box" placeholder="Search title, company..." id="search" />
+  <select class="mobile-sort" id="mobile-sort" onchange="mobileSortChange(this.value)">
+    <option value="score-desc">Score (high)</option>
+    <option value="score-asc">Score (low)</option>
+    <option value="title-asc">Title A-Z</option>
+    <option value="title-desc">Title Z-A</option>
+    <option value="region-asc">Region</option>
+    <option value="easy_apply-desc">Type</option>
+  </select>
   <span class="spacer"></span>
   <button class="action-btn outline" onclick="exportChecked()">Export CSV</button>
   <button class="action-btn" onclick="checkAllVisible()">Mark All Applied</button>
@@ -458,6 +473,29 @@ function prefillEasyApply() {
   // intentionally empty — Peter marks these manually after applying
 }
 
+// One-time migration: clear EA jobs that were auto-checked by the old prefillEasyApply()
+function migrateEasyApplyChecks() {
+  if (localStorage.getItem('job-pipeline-ea-migrated')) return;
+  // Remove all EA job URLs from checkedIds so they show up unchecked
+  let changed = false;
+  JOBS.forEach(j => {
+    if (j.easy_apply && checkedIds.has(j.url)) {
+      checkedIds.delete(j.url);
+      changed = true;
+    }
+  });
+  if (changed) saveChecks();
+  localStorage.setItem('job-pipeline-ea-migrated', '1');
+}
+
+// Mobile sort dropdown handler
+function mobileSortChange(val) {
+  const [field, dir] = val.split('-');
+  sortField = field;
+  sortAsc = dir === 'asc';
+  render();
+}
+
 // ─── Batch detection ───
 function getLatestBatch() {
   const dates = [...new Set(JOBS.map(j => j.scraped_at).filter(Boolean))].sort().reverse();
@@ -482,9 +520,8 @@ function getFilteredJobs() {
 
     if (currentTab === 'new' && (!isNew || isEA || !isTop)) return false;      // New external top jobs
     if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;     // Unchecked Easy Apply
-    if (currentTab === 'queue' && (isNew || isChecked || isEA || !isTop)) return false; // Old top external
     if (currentTab === 'applied' && !isChecked) return false;                  // All checked
-    if (currentTab === 'browse' && isTop) return false;                        // Lower score jobs only
+    if (currentTab === 'browse' && (isTop || isChecked)) return false;         // Lower score unchecked jobs
     // 'all' shows everything
 
     // Region / type filter
@@ -517,7 +554,8 @@ function render() {
   if (filtered.length === 0) {
     const msgs = {
       'new': 'No new jobs in the latest batch. Run the scraper!',
-      'queue': 'Queue is empty — all jobs have been reviewed.',
+      'easy_apply': 'No Easy Apply jobs available (or all marked as applied).',
+      'browse': 'No lower-score jobs to browse.',
       'applied': 'No jobs marked as applied yet.',
       'all': 'No jobs match your filters.'
     };
@@ -565,22 +603,18 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const top = JOBS.filter(j => j.score >= 0.9);
   const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && !j.easy_apply && j.score >= 0.9);
   const eaJobs = JOBS.filter(j => j.easy_apply && !checkedIds.has(j.url));
   const applied = JOBS.filter(j => checkedIds.has(j.url));
-  const queue = JOBS.filter(j => j.scraped_at !== latestBatch && !checkedIds.has(j.url) && !j.easy_apply && j.score >= 0.9);
   const browse = JOBS.filter(j => j.score < 0.9 && !checkedIds.has(j.url));
 
   document.getElementById('stat-new').textContent = newJobs.length;
-  document.getElementById('stat-queue').textContent = queue.length;
   document.getElementById('stat-ea').textContent = eaJobs.length;
   document.getElementById('stat-applied').textContent = applied.length;
-  document.getElementById('stat-total').textContent = top.length;
+  document.getElementById('stat-total').textContent = JOBS.length;
 
   document.getElementById('tab-new-count').textContent = newJobs.length;
   document.getElementById('tab-ea-count').textContent = eaJobs.length;
-  document.getElementById('tab-queue-count').textContent = queue.length;
   document.getElementById('tab-applied-count').textContent = applied.length;
   document.getElementById('tab-browse-count').textContent = browse.length;
   document.getElementById('tab-all-count').textContent = JOBS.length;
