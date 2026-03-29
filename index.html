@@ -90,6 +90,8 @@ body {
 .tab.active .count { background: var(--text); color: #fff; }
 .tab.new-tab .count { background: var(--new-green); color: #fff; }
 .tab.new-tab.active .count { background: var(--new-green); }
+.tab.ea-tab .count { background: #0a66c2; color: #fff; }
+.tab.ea-tab.active .count { background: #0a66c2; }
 
 /* Pulse dot for new tab */
 .pulse-dot {
@@ -288,8 +290,9 @@ body {
     </div>
     <div class="stats-bar">
       <div class="stat new-stat">New <b id="stat-new">0</b></div>
-      <div class="stat">Queue <b id="stat-queue">0</b></div>
-      <div class="stat checked-stat">Applied <b id="stat-applied">0</b></div>
+      <div class="stat">VA <b id="stat-queue">0</b></div>
+      <div class="stat" style="color:#0a66c2">EA <b id="stat-ea" style="color:#0a66c2">0</b></div>
+      <div class="stat checked-stat">Done <b id="stat-applied">0</b></div>
       <div class="stat">Total <b id="stat-total">0</b></div>
     </div>
   </div>
@@ -297,8 +300,11 @@ body {
     <button class="tab new-tab active" data-tab="new">
       <span class="pulse-dot"></span> New Today <span class="count" id="tab-new-count">0</span>
     </button>
+    <button class="tab ea-tab" data-tab="easy_apply">
+      Easy Apply <span class="count" id="tab-ea-count">0</span>
+    </button>
     <button class="tab" data-tab="queue">
-      Review Queue <span class="count" id="tab-queue-count">0</span>
+      VA Queue <span class="count" id="tab-queue-count">0</span>
     </button>
     <button class="tab" data-tab="applied">
       Applied <span class="count" id="tab-applied-count">0</span>
@@ -359,16 +365,9 @@ function saveChecks() {
   localStorage.setItem('job-pipeline-checks', JSON.stringify([...checkedIds]));
 }
 
-// Auto-mark Easy Apply jobs (Peter applies, not VA)
+// No auto-marking — Easy Apply jobs stay in their own tab for Peter
 function prefillEasyApply() {
-  let added = 0;
-  JOBS.forEach(j => {
-    if (j.easy_apply && !checkedIds.has(j.url)) {
-      checkedIds.add(j.url);
-      added++;
-    }
-  });
-  if (added > 0) saveChecks();
+  // intentionally empty — Peter marks these manually after applying
 }
 
 // ─── Batch detection ───
@@ -389,10 +388,12 @@ function getFilteredJobs() {
     // Tab filter
     const isChecked = checkedIds.has(j.url);
     const isNew = j.scraped_at === latestBatch && !isChecked;
+    const isEA = !!j.easy_apply;
 
-    if (currentTab === 'new' && !isNew) return false;
-    if (currentTab === 'queue' && (isNew || isChecked)) return false;
-    if (currentTab === 'applied' && !isChecked) return false;
+    if (currentTab === 'new' && (!isNew || isEA)) return false;         // New external jobs only
+    if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false; // Unchecked Easy Apply
+    if (currentTab === 'queue' && (isNew || isChecked || isEA)) return false; // Old external unchecked
+    if (currentTab === 'applied' && !isChecked) return false;            // All checked
     // 'all' shows everything
 
     // Region / type filter
@@ -475,16 +476,19 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url));
+  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && !j.easy_apply);
+  const eaJobs = JOBS.filter(j => j.easy_apply && !checkedIds.has(j.url));
   const applied = JOBS.filter(j => checkedIds.has(j.url));
-  const queue = JOBS.filter(j => j.scraped_at !== latestBatch && !checkedIds.has(j.url));
+  const queue = JOBS.filter(j => j.scraped_at !== latestBatch && !checkedIds.has(j.url) && !j.easy_apply);
 
   document.getElementById('stat-new').textContent = newJobs.length;
   document.getElementById('stat-queue').textContent = queue.length;
+  document.getElementById('stat-ea').textContent = eaJobs.length;
   document.getElementById('stat-applied').textContent = applied.length;
   document.getElementById('stat-total').textContent = JOBS.length;
 
   document.getElementById('tab-new-count').textContent = newJobs.length;
+  document.getElementById('tab-ea-count').textContent = eaJobs.length;
   document.getElementById('tab-queue-count').textContent = queue.length;
   document.getElementById('tab-applied-count').textContent = applied.length;
   document.getElementById('tab-all-count').textContent = JOBS.length;
