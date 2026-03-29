@@ -258,6 +258,9 @@ body {
 }
 .section-divider .line { flex: 1; height: 1px; background: var(--border); }
 
+/* ─── Mobile inline tags (hidden on desktop) ─── */
+.mobile-tags { display: none; }
+
 /* ─── Toast ─── */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
@@ -271,12 +274,85 @@ body {
 }
 
 /* ─── Responsive ─── */
+/* ─── Tablet ─── */
 @media (max-width: 900px) {
-  .job-row, .col-header { grid-template-columns: 32px 1fr 80px 50px; }
+  .job-row, .col-header { grid-template-columns: 32px 1fr 80px 60px; }
   .job-location, .score-bar { display: none; }
   .controls-row { gap: 4px; }
   .search-box { width: 130px; }
   .tab { padding: 8px 12px; font-size: 12px; }
+}
+
+/* ─── Mobile ─── */
+@media (max-width: 500px) {
+  .header { padding: 10px 12px 0; }
+  .header-top {
+    flex-direction: column; align-items: flex-start; gap: 6px;
+    margin-bottom: 8px;
+  }
+  .logo { font-size: 17px; }
+  .batch-info { font-size: 10px; margin-left: 8px; padding: 1px 6px; }
+  .stats-bar {
+    gap: 12px; font-size: 11px; width: 100%;
+    justify-content: flex-start;
+  }
+  .stat b { font-size: 14px; }
+
+  /* Scrollable tabs */
+  .tabs {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; gap: 0; flex-wrap: nowrap;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 7px 10px; font-size: 11px; white-space: nowrap; flex-shrink: 0;
+  }
+  .tab .count { font-size: 10px; padding: 1px 5px; }
+  .pulse-dot { width: 6px; height: 6px; }
+
+  /* Controls */
+  .controls-row {
+    padding: 8px 12px; gap: 4px; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; flex-wrap: nowrap;
+  }
+  .controls-row::-webkit-scrollbar { display: none; }
+  .filter-btn { padding: 4px 8px; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+  .search-box { width: 120px; font-size: 11px; padding: 4px 8px; flex-shrink: 0; }
+  .action-btn { padding: 4px 10px; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+
+  /* Column header — hide it on mobile, info is in the rows */
+  .col-header { display: none; }
+
+  /* Job rows — simplified 2-column layout */
+  .job-list { padding: 0 8px 80px; }
+  .job-row {
+    grid-template-columns: 28px 1fr;
+    gap: 8px; padding: 10px 8px;
+  }
+  .job-location, .region-tag, .score-bar { display: none; }
+
+  /* Show region + score inline in meta */
+  .job-title-link { font-size: 13px; }
+  .job-meta { font-size: 10px; }
+  .new-badge { font-size: 8px; padding: 1px 4px; }
+  .easy-apply-tag, .ext-apply-tag { font-size: 8px; padding: 1px 4px; }
+
+  /* Type column becomes inline */
+  .job-row > div:nth-child(n+3) { display: none; }
+
+  /* Show inline tags on mobile */
+  .mobile-tags {
+    display: inline-flex !important; gap: 4px; align-items: center; margin-left: 4px;
+  }
+  .mobile-tags .region-tag { display: inline-block !important; font-size: 9px; padding: 1px 5px; }
+  .mobile-tags .easy-apply-tag,
+  .mobile-tags .ext-apply-tag { display: inline-block !important; }
+  .mobile-tags b { font-size: 10px; }
+
+  .check { width: 24px; height: 24px; }
+  .check.on::after { font-size: 14px; }
+
+  .toast { font-size: 12px; padding: 8px 16px; bottom: 16px; }
 }
 </style>
 </head>
@@ -445,13 +521,15 @@ function render() {
       const newBadge = isNew ? '<span class="new-badge">new</span>' : '';
       const posted = j.posted ? j.posted : '';
       const meta = [j.company, j.salary, posted].filter(Boolean).join(' \u2022 ');
+      const mobileScore = j.score >= 0.95 ? `<b class="${scoreClass}">${j.score.toFixed(2)}</b>` : '';
+      const mobileTags = `<span class="mobile-tags"><span class="region-tag ${regionClass}">${j.region}</span>${mobileScore}${typeLabel}</span>`;
 
       return `
         <div class="job-row ${isChecked ? 'checked' : ''} ${isNew ? 'is-new' : ''}">
           <div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${j.url.replace(/'/g, "\\'")}')"></div>
           <div>
             <a class="job-title-link" href="${j.url}" target="_blank">${esc(j.title)}${newBadge}</a>
-            <div class="job-meta">${esc(meta)}</div>
+            <div class="job-meta">${esc(meta)}${mobileTags}</div>
           </div>
           <div class="job-location">${esc(j.location)}</div>
           <div><span class="region-tag ${regionClass}">${j.region}</span></div>
