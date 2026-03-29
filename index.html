@@ -385,6 +385,9 @@ body {
     <button class="tab" data-tab="applied">
       Applied <span class="count" id="tab-applied-count">0</span>
     </button>
+    <button class="tab" data-tab="browse">
+      Browse <span class="count" id="tab-browse-count">0</span>
+    </button>
     <button class="tab" data-tab="all">
       All <span class="count" id="tab-all-count">0</span>
     </button>
@@ -466,10 +469,13 @@ function getFilteredJobs() {
     const isNew = j.scraped_at === latestBatch && !isChecked;
     const isEA = !!j.easy_apply;
 
-    if (currentTab === 'new' && (!isNew || isEA)) return false;         // New external jobs only
-    if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false; // Unchecked Easy Apply
-    if (currentTab === 'queue' && (isNew || isChecked || isEA)) return false; // Old external unchecked
-    if (currentTab === 'applied' && !isChecked) return false;            // All checked
+    const isTop = j.score >= 0.9;
+
+    if (currentTab === 'new' && (!isNew || isEA || !isTop)) return false;      // New external top jobs
+    if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;     // Unchecked Easy Apply
+    if (currentTab === 'queue' && (isNew || isChecked || isEA || !isTop)) return false; // Old top external
+    if (currentTab === 'applied' && !isChecked) return false;                  // All checked
+    if (currentTab === 'browse' && isTop) return false;                        // Lower score jobs only
     // 'all' shows everything
 
     // Region / type filter
@@ -484,10 +490,6 @@ function getFilteredJobs() {
     }
     return true;
   }).sort((a, b) => {
-    // New jobs always sort by score desc first
-    if (currentTab === 'new') {
-      return b.score - a.score;
-    }
     let va = a[sortField], vb = b[sortField];
     if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
     if (typeof va === 'boolean') { va = va ? 1 : 0; vb = vb ? 1 : 0; }
@@ -554,21 +556,24 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && !j.easy_apply);
+  const top = JOBS.filter(j => j.score >= 0.9);
+  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && !j.easy_apply && j.score >= 0.9);
   const eaJobs = JOBS.filter(j => j.easy_apply && !checkedIds.has(j.url));
   const applied = JOBS.filter(j => checkedIds.has(j.url));
-  const queue = JOBS.filter(j => j.scraped_at !== latestBatch && !checkedIds.has(j.url) && !j.easy_apply);
+  const queue = JOBS.filter(j => j.scraped_at !== latestBatch && !checkedIds.has(j.url) && !j.easy_apply && j.score >= 0.9);
+  const browse = JOBS.filter(j => j.score < 0.9 && !checkedIds.has(j.url));
 
   document.getElementById('stat-new').textContent = newJobs.length;
   document.getElementById('stat-queue').textContent = queue.length;
   document.getElementById('stat-ea').textContent = eaJobs.length;
   document.getElementById('stat-applied').textContent = applied.length;
-  document.getElementById('stat-total').textContent = JOBS.length;
+  document.getElementById('stat-total').textContent = top.length;
 
   document.getElementById('tab-new-count').textContent = newJobs.length;
   document.getElementById('tab-ea-count').textContent = eaJobs.length;
   document.getElementById('tab-queue-count').textContent = queue.length;
   document.getElementById('tab-applied-count').textContent = applied.length;
+  document.getElementById('tab-browse-count').textContent = browse.length;
   document.getElementById('tab-all-count').textContent = JOBS.length;
 
   // Batch info
