@@ -1137,10 +1137,20 @@ function render() {
           ${eaButtons}
           <div>
             <a class="job-title-link" href="${jobUrl}" target="_blank" rel="noopener">${esc(j.title)}${newBadge}${idealBadge}${rejBadge}</a>
-            ${isChecked ? (() => {
-              const emailNum = getEmailForJob(j.url);
-              return emailNum ? `<div style="font-size:10px; color:#1565c0; margin-top:1px; cursor:pointer; user-select:all;" title="Click to copy email" data-action="copy-email" data-email="${esc(generateEmail(emailNum))}">📧 ${esc(generateEmail(emailNum))}</div>` : '';
-            })() : ''}
+            ${(() => {
+              // Show unique email for Cherry to copy when applying
+              if (currentTab === 'easy_apply') return '';
+              let emailNum = getEmailForJob(j.url);
+              if (!emailNum) {
+                emailNum = getNextEmailNumber();
+                const nurl = normUrl(j.url);
+                if (!serverTimestamps[nurl]) serverTimestamps[nurl] = {};
+                serverTimestamps[nurl].emailNum = emailNum;
+                window._emailsAssigned = true;
+              }
+              const email = generateEmail(emailNum);
+              return `<div style="font-size:10px; color:#1565c0; margin-top:1px; cursor:pointer; user-select:all; font-family:'DM Mono',monospace;" title="Click to copy" data-action="copy-email" data-email="${esc(email)}">📧 ${esc(email)}</div>`;
+            })()}
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
             ${j.ai_reasoning ? `<div style="font-size:11px; color:#888; margin-top:2px; font-style:italic; line-height:1.3;">${j.work_mode && j.work_mode !== 'unknown' ? `<span style="background:${j.work_mode === 'remote' ? '#e8f5e9' : j.work_mode === 'hybrid' ? '#fff3e0' : '#fde8e8'};color:${j.work_mode === 'remote' ? '#2e7d32' : j.work_mode === 'hybrid' ? '#e65100' : '#c62828'};padding:1px 4px;border-radius:3px;font-size:9px;font-weight:600;font-style:normal;margin-right:4px;">${j.work_mode.toUpperCase()}</span>` : ''}${esc(j.ai_reasoning)}</div>` : ''}
           </div>
@@ -1171,6 +1181,11 @@ function render() {
       html += rejected.map(j => renderJobRow(j, false)).join('');
     }
     container.innerHTML = html;
+    // Batch-sync email assignments to JSONBin (once after all rows rendered)
+    if (window._emailsAssigned) {
+      window._emailsAssigned = false;
+      debouncedSync();
+    }
   }
   updateStats();
 }
