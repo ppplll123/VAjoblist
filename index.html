@@ -526,7 +526,7 @@ function getFilteredJobs() {
     const isEA = !!j.easy_apply;
     const isTop = j.score >= 0.9;
 
-    if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;      // New top external jobs (for VA)
+    if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;      // New top external jobs (for VA — EA excluded)
     if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
     if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;     // Unchecked Easy Apply (for Peter)
     if (currentTab === 'applied' && !isChecked) return false;                  // All checked
