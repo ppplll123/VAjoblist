@@ -692,9 +692,32 @@ function loadFromHash() {
 window.addEventListener('hashchange', () => { loadFromHash(); render(); });
 
 // ─── Persistence (localStorage + JSONBin server-side) ───
+// WARNING: This API key is publicly exposed in client-side HTML served via GitHub Pages.
+// It should be replaced with a READ-ONLY key when possible (create one at jsonbin.io).
+// Currently the same key is used for both read and write operations.
 const JSONBIN_ID = '69c9d77336566621a85de249';
 const JSONBIN_KEY = '$2a$10$u1NdcqmI4Zuy1Zq4cyH5q.ZaMEXW11MAm0rUpeLaCiypZBCDrNdLK';
 let syncTimeout = null;
+
+// Validate data structure before writing to JSONBin (mitigate abuse of exposed key)
+function validateSyncPayload(payload) {
+  if (typeof payload !== 'object' || payload === null) return false;
+  if (!Array.isArray(payload.urls)) return false;
+  if (typeof payload.timestamps !== 'object') return false;
+  if (typeof payload.feedback !== 'object') return false;
+  if (typeof payload.last_updated !== 'string') return false;
+  // Validate URLs are strings
+  if (!payload.urls.every(u => typeof u === 'string')) return false;
+  // Validate feedback entries have expected structure
+  for (const [url, fb] of Object.entries(payload.feedback)) {
+    if (typeof url !== 'string') return false;
+    if (typeof fb !== 'object' || fb === null) return false;
+    if (fb.reason && typeof fb.reason !== 'string') return false;
+  }
+  // Cap payload size to prevent abuse (max ~2MB)
+  if (JSON.stringify(payload).length > 2 * 1024 * 1024) return false;
+  return true;
+}
 
 function loadChecks() {
   try {
@@ -768,14 +791,21 @@ async function syncToServer() {
       const n = normUrl(url);
       if (!serverTimestamps[n]) serverTimestamps[n] = now;
     });
-    // Remove unchecked URLs from timestamps
+    // Remove unchecked URLs from timestamps (normalize for comparison)
     Object.keys(serverTimestamps).forEach(url => {
-      if (!checkedIds.has(url)) delete serverTimestamps[url];
+      const hasRaw = checkedIds.has(url);
+      const hasNorm = checkedIds.has(normUrl(url));
+      if (!hasRaw && !hasNorm) delete serverTimestamps[url];
     });
+    const payload = { urls: [...checkedIds], timestamps: serverTimestamps, feedback: feedbackData, last_updated: now };
+    if (!validateSyncPayload(payload)) {
+      console.warn('JSONBin sync aborted: payload failed validation');
+      return;
+    }
     await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_KEY },
-      body: JSON.stringify({ urls: [...checkedIds], timestamps: serverTimestamps, feedback: feedbackData, last_updated: now })
+      body: JSON.stringify(payload)
     });
   } catch(e) { /* offline is fine */ }
 }
@@ -1135,7 +1165,7 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 function relativeDate(dateStr) {
   if (!dateStr) return '';
   const now = new Date();
-  const d = new Date(dateStr + 'T12:00:00');
+  const d = new Date(dateStr + 'T12:00:00Z');
   const diffMs = now - d;
   const diffH = Math.floor(diffMs / 3600000);
   const diffD = Math.floor(diffMs / 86400000);
