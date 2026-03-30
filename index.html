@@ -592,7 +592,7 @@ async function syncToServer() {
     await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_KEY },
-      body: JSON.stringify({ urls: [...checkedIds], timestamps: serverTimestamps, last_updated: now })
+      body: JSON.stringify({ urls: [...checkedIds], timestamps: serverTimestamps, feedback: feedbackData, last_updated: now })
     });
   } catch(e) { /* offline is fine */ }
 }
