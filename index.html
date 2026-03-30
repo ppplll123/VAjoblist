@@ -764,7 +764,13 @@ function submitFeedback(url, reason, detail) {
 function isRejected(url) {
   const fb = feedbackData[url];
   if (!fb) return false;
-  return fb.reason !== 'ideal';  // "Ideal" and no reason = positive feedback
+  return fb.reason !== 'ideal' && fb.reason !== 'ea_applied';  // Positive feedback, not rejection
+}
+
+function eaApply(e, url) {
+  // Peter applied via Easy Apply — positive signal for the model
+  submitFeedback(url, 'ea_applied', '');
+  toggleCheck(e, url);
 }
 
 function showEaRejectInput(btn, url) {
@@ -972,7 +978,7 @@ function render() {
       // EA tab: show A/R buttons instead of checkbox
       const eaButtons = (currentTab === 'easy_apply' && !isChecked && !rej) ? `
           <div style="display:flex; gap:4px; flex-direction:column; align-items:center;">
-            <button onclick="toggleCheck(event,'${escapedUrl}')" style="width:28px;height:22px;border:1px solid #4caf50;background:#e8f5e9;color:#2e7d32;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Applied">A</button>
+            <button onclick="eaApply(event,'${escapedUrl}')" style="width:28px;height:22px;border:1px solid #4caf50;background:#e8f5e9;color:#2e7d32;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Applied">A</button>
             <button onclick="showEaRejectInput(this,'${escapedUrl}')" style="width:28px;height:22px;border:1px solid #e57373;background:#fce4e4;color:#c62828;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Rejected (type reason)">R</button>
           </div>` : `<div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${escapedUrl}')"></div>`;
 
