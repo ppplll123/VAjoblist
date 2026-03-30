@@ -92,6 +92,9 @@ body {
 .tab.new-tab.active .count { background: var(--new-green); }
 .tab.ea-tab .count { background: #0a66c2; color: #fff; }
 .tab.ea-tab.active .count { background: #0a66c2; }
+.tab.prof-tab .count { background: #673ab7; color: #fff; }
+.tab.prof-tab.active { color: #673ab7; border-color: #673ab7; }
+.tab.prof-tab.active .count { background: #673ab7; }
 .tab.cherry-tab .count { background: #c0392b; color: #fff; }
 .tab.cherry-tab.active { color: #c0392b; border-color: #c0392b; }
 .tab.cherry-tab.active .count { background: #c0392b; }
@@ -440,6 +443,9 @@ body {
     <button class="tab" data-tab="all">
       All <span class="count" id="tab-all-count">0</span>
     </button>
+    <button class="tab prof-tab" data-tab="professor" style="box-shadow: inset 0 0 0 1px rgba(103,58,183,0.25), 0 1px 4px rgba(103,58,183,0.1);">
+      Professor <span class="count" id="tab-prof-count">0</span>
+    </button>
     <button class="tab cherry-tab" data-tab="stats">
       Cherry <span class="count cherry-count" id="tab-cherry-count">0/40</span>
     </button>
@@ -721,6 +727,8 @@ function getFilteredJobs() {
     const isEA = !!j.easy_apply;
     const isTop = j.score >= 0.9;
 
+    const isProf = /\b(professor|lecturer|faculty|academic)\b/i.test(j.title);
+    if (currentTab === 'professor' && !isProf) return false;                     // Professor/academic positions only
     if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;        // Jobs posted in last 24hrs, score ≥ 0.9, external only
     if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
     if (currentTab === 'easy_apply' && !isEA) return false;                    // All Easy Apply jobs (Peter) — checked shown crossed out at bottom
@@ -818,11 +826,14 @@ function render() {
     const renderJobRow = (j, showFb) => {
       const isChecked = checkedIds.has(j.url);
       const isNew = isNewJob(j) && !isChecked;
-      const rej = feedbackData[j.url];
+      const fb = feedbackData[j.url];
+      const rej = fb && fb.reason !== 'ideal' ? fb : null;  // "ideal" is positive, not rejection
+      const isIdeal = fb && fb.reason === 'ideal';
       const scoreClass = j.score >= 0.97 ? 'score-hot' : j.score >= 0.93 ? 'score-warm' : 'score-cool';
       const regionClass = j.region.toLowerCase().replace('/', '');
       const typeLabel = j.easy_apply ? '<span class="easy-apply-tag">Easy Apply</span>' : '<span class="ext-apply-tag">External</span>';
       const newBadge = isNew ? '<span class="new-badge">new</span>' : '';
+      const idealBadge = isIdeal ? '<span class="new-badge" style="background:#4caf50;">Ideal</span>' : '';
       const rejLabel = rej ? (rej.reason === 'other' && rej.detail ? `other: ${rej.detail}` : rej.reason) : '';
       const rejBadge = rej ? `<span class="rejected-reason">${rejLabel}</span>` : '';
       const posted = j.posted || '';
@@ -838,7 +849,7 @@ function render() {
         <div class="${rowClass}">
           <div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${escapedUrl}')"></div>
           <div>
-            <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}${rejBadge}</a>
+            <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}${idealBadge}${rejBadge}</a>
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
           </div>
           <div class="job-posted">${relPosted}</div>
@@ -847,7 +858,7 @@ function render() {
           <div class="score-bar ${scoreClass}">${j.score.toFixed(2)}</div>
           <div>${typeLabel}</div>
         </div>`;
-      if (showFb && !rej && !isChecked) {
+      if (showFb && !rej && !isChecked && !isIdeal) {
         html += `<div class="feedback-row" id="fb-row-${escapedUrl.replace(/[^a-zA-Z0-9]/g,'_')}">
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','role')">Wrong Role</button>
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','seniority')">Wrong Seniority</button>
@@ -915,8 +926,10 @@ function updateStats() {
   document.getElementById('tab-top-count').textContent = topJobs.length;
   document.getElementById('tab-ea-count').textContent = allEA.length;
   document.getElementById('tab-applied-count').textContent = cherryApplied.length;
+  const profJobs = JOBS.filter(j => /\b(professor|lecturer|faculty|academic)\b/i.test(j.title));
   document.getElementById('tab-browse-count').textContent = browse.length;
   document.getElementById('tab-all-count').textContent = JOBS.length;
+  document.getElementById('tab-prof-count').textContent = profJobs.length;
   document.getElementById('tab-cherry-count').textContent = `${cherryApplied.length}/40`;
 
   // Batch info
