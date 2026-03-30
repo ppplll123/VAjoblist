@@ -1071,7 +1071,7 @@ function render() {
           <div>
             <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}${idealBadge}${rejBadge}</a>
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
-            ${j.ai_reasoning ? `<div style="font-size:11px; color:#888; margin-top:2px; font-style:italic; line-height:1.3;">${esc(j.ai_reasoning)}</div>` : ''}
+            ${j.ai_reasoning ? `<div style="font-size:11px; color:#888; margin-top:2px; font-style:italic; line-height:1.3;">${j.work_mode && j.work_mode !== 'unknown' ? `<span style="background:${j.work_mode === 'remote' ? '#e8f5e9' : j.work_mode === 'hybrid' ? '#fff3e0' : '#fde8e8'};color:${j.work_mode === 'remote' ? '#2e7d32' : j.work_mode === 'hybrid' ? '#e65100' : '#c62828'};padding:1px 4px;border-radius:3px;font-size:9px;font-weight:600;font-style:normal;margin-right:4px;">${j.work_mode.toUpperCase()}</span>` : ''}${esc(j.ai_reasoning)}</div>` : ''}
           </div>
           <div class="job-posted">${relPosted}</div>
           <div class="job-location">${esc(j.location)}</div>
