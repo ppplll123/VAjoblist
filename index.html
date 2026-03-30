@@ -1015,7 +1015,7 @@ function render() {
       const posted = j.posted || '';
       const relPosted = posted ? relativeDate(posted) : '';
       const meta = [j.company, j.salary, posted].filter(Boolean).join(' \u2022 ');
-      const mobileScore = j.score >= 0.95 ? `<b class="${scoreClass}">${j.score.toFixed(2)}</b>` : '';
+      const mobileScore = j.score > 0 ? `<b class="${scoreClass}">${j.score.toFixed(2)}</b>` : '';
       const mobileTags = `<span class="mobile-tags"><span class="region-tag ${regionClass}">${j.region}</span>${mobileScore}${typeLabel}</span>`;
       const jobUrl = j.url;
       const escapedUrl = j.url.replace(/'/g, "\\'");
