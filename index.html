@@ -256,6 +256,14 @@ body {
   font-size: 9px; font-weight: 600; font-family: 'DM Mono', monospace;
   background: #6b728015; color: #6b7280; border: 1px solid #6b728033;
 }
+.source-badge {
+  display: inline-block; padding: 1px 5px; border-radius: 3px;
+  font-size: 8px; font-weight: 700; font-family: 'DM Mono', monospace;
+  letter-spacing: 0.3px; text-transform: uppercase; vertical-align: middle;
+  margin-right: 3px;
+}
+.source-li { background: #0a66c215; color: #0a66c2; border: 1px solid #0a66c233; }
+.source-in { background: #2164f315; color: #2164f3; border: 1px solid #2164f333; }
 
 /* ─── Feedback buttons ─── */
 .feedback-row {
@@ -946,7 +954,8 @@ function render() {
       const isIdeal = fb && fb.reason === 'ideal';
       const scoreClass = j.score >= 0.97 ? 'score-hot' : j.score >= 0.93 ? 'score-warm' : 'score-cool';
       const regionClass = j.region.toLowerCase().replace('/', '');
-      const typeLabel = j.easy_apply ? '<span class="easy-apply-tag">Easy Apply</span>' : '<span class="ext-apply-tag">External</span>';
+      const srcBadge = j.source === 'indeed' ? '<span class="source-badge source-in">IN</span>' : '<span class="source-badge source-li">LI</span>';
+      const typeLabel = j.easy_apply ? `${srcBadge}<span class="easy-apply-tag">Easy Apply</span>` : `${srcBadge}<span class="ext-apply-tag">External</span>`;
       const newBadge = isNew ? '<span class="new-badge">new</span>' : '';
       const idealBadge = isIdeal ? '<span class="new-badge" style="background:#4caf50;">Ideal</span>' : '';
       const rejLabel = rej ? (rej.reason === 'other' && rej.detail ? `other: ${rej.detail}` : rej.reason) : '';
