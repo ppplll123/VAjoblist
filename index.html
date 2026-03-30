@@ -1384,7 +1384,14 @@ document.addEventListener('keydown', e => {
 loadFromHash();
 loadChecks();
 loadFeedbackLocal();
-renderStats(); // Load Cherry header progress bar on all tabs
+// Cherry header bar: retry until JSONBin data loads
+(async function initCherryHeader() {
+  for (let i = 0; i < 10; i++) {
+    await renderStats();
+    if (document.getElementById('cherry-progress-header')?.style.display !== 'none') break;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+})();
 </script>
 <script src="jobs-data.js?v=20260330b"></script>
 </body>
