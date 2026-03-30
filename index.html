@@ -520,6 +520,11 @@ function loadChecks() {
   loadFromServer();
 }
 
+// Normalize LinkedIn country subdomains → www (prevent dupes)
+function normUrl(url) {
+  return url.replace(/https?:\/\/[a-z]{2}\.linkedin\.com\//, 'https://www.linkedin.com/');
+}
+
 async function loadFromServer() {
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
@@ -563,10 +568,11 @@ async function syncToServer() {
         }
       } catch(e) {}
     }
-    // Only set timestamp for NEW clicks (not already tracked)
+    // Only set timestamp for NEW clicks (not already tracked), normalize URLs
     const now = new Date().toISOString();
     checkedIds.forEach(url => {
-      if (!serverTimestamps[url]) serverTimestamps[url] = now;
+      const n = normUrl(url);
+      if (!serverTimestamps[n]) serverTimestamps[n] = now;
     });
     // Remove unchecked URLs from timestamps
     Object.keys(serverTimestamps).forEach(url => {
@@ -992,11 +998,11 @@ async function renderStats() {
   const cherryApplied = allApplied.filter(j => !j.easy_apply);  // Cherry = external only
   const eaApplied = allApplied.filter(j => j.easy_apply);
 
-  // Group by date (only count external/VA applications for Cherry)
+  // Group by date — ONLY count jobs that exist in dashboard AND are external (not Easy Apply)
   const byDate = {};
   Object.entries(ts).forEach(([url, t]) => {
     const j = JOBS.find(x => x.url === url);
-    if (j && j.easy_apply) return; // skip Easy Apply (Peter's)
+    if (!j || j.easy_apply) return; // skip Easy Apply (Peter's) and unknown URLs
     const day = t.slice(0, 10);
     byDate[day] = (byDate[day] || 0) + 1;
   });
@@ -1013,14 +1019,9 @@ async function renderStats() {
 
   content.innerHTML = `
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#333;">${allApplied.length}</div>
-      <div style="font-size:13px; color:#888;">Total Applied</div>
-      <div style="font-size:10px; color:#aaa;">VA + Peter EA</div>
-    </div>
-    <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
       <div style="font-size:32px; font-weight:700; color:#c0392b;">${cherryApplied.length}</div>
       <div style="font-size:13px; color:#888;">Cherry Applied</div>
-      <div style="font-size:10px; color:#aaa;">External only</div>
+      <div style="font-size:10px; color:#aaa;">External only (all time)</div>
     </div>
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
       <div style="font-size:32px; font-weight:700; color:${progressColor};">${cherryToday} / ${dailyTarget}</div>
@@ -1032,8 +1033,8 @@ async function renderStats() {
     </div>
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
       <div style="font-size:32px; font-weight:700; color:#2980b9;">${cherryToday}</div>
-      <div style="font-size:13px; color:#888;">Applied Today</div>
-      <div style="font-size:10px; color:#aaa;">Cherry external only</div>
+      <div style="font-size:13px; color:#888;">Cherry Today</div>
+      <div style="font-size:10px; color:#aaa;">External only</div>
     </div>
   `;
 
