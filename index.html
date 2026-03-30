@@ -251,6 +251,31 @@ body {
   background: #6b728015; color: #6b7280; border: 1px solid #6b728033;
 }
 
+/* ─── Feedback buttons ─── */
+.feedback-row {
+  display: flex; gap: 4px; padding: 2px 14px 6px 56px;
+  border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.fb-btn {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  padding: 2px 8px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text2); transition: all 0.15s;
+}
+.fb-btn:hover { border-color: var(--accent); color: var(--accent); background: #fff; }
+.job-row.rejected {
+  background: #fef2f2; opacity: 0.5;
+}
+.job-row.rejected .job-title-link {
+  text-decoration: line-through; color: var(--text2);
+}
+.rejected-reason {
+  font-family: 'DM Mono', monospace; font-size: 9px;
+  color: var(--accent); margin-left: 6px;
+  padding: 1px 5px; border-radius: 3px;
+  background: #c8553a15; border: 1px solid #c8553a33;
+}
+
 /* ─── Section divider ─── */
 .section-divider {
   padding: 14px 14px 8px;
@@ -416,14 +441,14 @@ body {
       All <span class="count" id="tab-all-count">0</span>
     </button>
     <button class="tab" data-tab="stats">
-      Stats
+      Cherry
     </button>
   </div>
 </div>
 
-<!-- Stats panel (hidden by default, shown when Stats tab active) -->
+<!-- Cherry panel (hidden by default, shown when Cherry tab active) -->
 <div id="stats-panel" style="display:none; padding: 20px;">
-  <h3 style="margin:0 0 16px; font-size:18px;">VA Performance</h3>
+  <h3 style="margin:0 0 16px; font-size:18px;">Cherry's Performance</h3>
   <div id="stats-content" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
   </div>
   <h3 style="margin:24px 0 12px; font-size:16px;">Recent Applications</h3>
@@ -474,6 +499,7 @@ body {
 let JOBS = [];
 let APPLIED_COMPANIES = [];
 let checkedIds = new Set();
+let feedbackData = {};  // { url: { reason, timestamp } }
 let currentTab = 'new';
 let currentFilter = 'all';
 let currentSearch = '';
@@ -552,6 +578,71 @@ async function syncToServer() {
       body: JSON.stringify({ urls: [...checkedIds], timestamps: serverTimestamps, last_updated: now })
     });
   } catch(e) { /* offline is fine */ }
+}
+
+// ─── Feedback persistence (JSONBin) ───
+function loadFeedbackLocal() {
+  try {
+    const saved = localStorage.getItem('job-pipeline-feedback');
+    if (saved) feedbackData = JSON.parse(saved);
+  } catch(e) {}
+  loadFeedbackFromServer();
+}
+
+async function loadFeedbackFromServer() {
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+      headers: { 'X-Access-Key': JSONBIN_KEY }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const serverFb = data.record?.feedback || {};
+    let changed = false;
+    Object.entries(serverFb).forEach(([url, info]) => {
+      if (!feedbackData[url]) { feedbackData[url] = info; changed = true; }
+    });
+    if (changed) { saveFeedbackLocal(); render(); }
+  } catch(e) {}
+}
+
+function saveFeedbackLocal() {
+  localStorage.setItem('job-pipeline-feedback', JSON.stringify(feedbackData));
+}
+
+let feedbackSyncTimeout = null;
+function saveFeedback() {
+  saveFeedbackLocal();
+  clearTimeout(feedbackSyncTimeout);
+  feedbackSyncTimeout = setTimeout(syncFeedbackToServer, 2000);
+}
+
+async function syncFeedbackToServer() {
+  try {
+    const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+      headers: { 'X-Access-Key': JSONBIN_KEY }
+    });
+    let existing = {};
+    if (r.ok) { const d = await r.json(); existing = d.record || {}; }
+    existing.feedback = feedbackData;
+    existing.last_updated = new Date().toISOString();
+    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_KEY },
+      body: JSON.stringify(existing)
+    });
+  } catch(e) {}
+}
+
+function submitFeedback(url, reason) {
+  feedbackData[url] = { reason, timestamp: new Date().toISOString() };
+  saveFeedback();
+  render();
+  const labels = { role: 'Wrong Role', seniority: 'Wrong Seniority', company: 'Wrong Company' };
+  showToast(`Marked as "${labels[reason]}"`);
+}
+
+function isRejected(url) {
+  return !!feedbackData[url];
 }
 
 // Auto-mark jobs from companies we applied to (baked into JS from Gmail sync)
@@ -667,26 +758,34 @@ function render() {
     };
     container.innerHTML = `<div class="empty">${msgs[currentTab] || msgs.all}</div>`;
   } else {
-    container.innerHTML = filtered.map(j => {
+    // Separate rejected and non-rejected jobs
+    const showFeedbackBtns = ['new', 'top'].includes(currentTab);
+    const nonRejected = showFeedbackBtns ? filtered.filter(j => !isRejected(j.url)) : filtered;
+    const rejected = showFeedbackBtns ? filtered.filter(j => isRejected(j.url)) : [];
+
+    const renderJobRow = (j, showFb) => {
       const isChecked = checkedIds.has(j.url);
       const isNew = j.scraped_at === latestBatch && !isChecked;
+      const rej = feedbackData[j.url];
       const scoreClass = j.score >= 0.97 ? 'score-hot' : j.score >= 0.93 ? 'score-warm' : 'score-cool';
       const regionClass = j.region.toLowerCase().replace('/', '');
       const typeLabel = j.easy_apply ? '<span class="easy-apply-tag">Easy Apply</span>' : '<span class="ext-apply-tag">External</span>';
       const newBadge = isNew ? '<span class="new-badge">new</span>' : '';
+      const rejBadge = rej ? `<span class="rejected-reason">${rej.reason}</span>` : '';
       const posted = j.posted || '';
       const relPosted = posted ? relativeDate(posted) : '';
       const meta = [j.company, j.salary, posted].filter(Boolean).join(' \u2022 ');
       const mobileScore = j.score >= 0.95 ? `<b class="${scoreClass}">${j.score.toFixed(2)}</b>` : '';
       const mobileTags = `<span class="mobile-tags"><span class="region-tag ${regionClass}">${j.region}</span>${mobileScore}${typeLabel}</span>`;
-      // LinkedIn app uses Universal Links — normal https:// URLs auto-open in the app on iOS
       const jobUrl = j.url;
+      const escapedUrl = j.url.replace(/'/g, "\\'");
+      const rowClass = `job-row ${isChecked ? 'checked' : ''} ${isNew ? 'is-new' : ''} ${rej ? 'rejected' : ''}`;
 
-      return `
-        <div class="job-row ${isChecked ? 'checked' : ''} ${isNew ? 'is-new' : ''}">
-          <div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${j.url.replace(/'/g, "\\'")}')"></div>
+      let html = `
+        <div class="${rowClass}">
+          <div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${escapedUrl}')"></div>
           <div>
-            <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}</a>
+            <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}${rejBadge}</a>
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
           </div>
           <div class="job-posted">${relPosted}</div>
@@ -695,7 +794,22 @@ function render() {
           <div class="score-bar ${scoreClass}">${j.score.toFixed(2)}</div>
           <div>${typeLabel}</div>
         </div>`;
-    }).join('');
+      if (showFb && !rej && !isChecked) {
+        html += `<div class="feedback-row">
+          <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','role')">Wrong Role</button>
+          <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','seniority')">Wrong Seniority</button>
+          <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','company')">Wrong Company</button>
+        </div>`;
+      }
+      return html;
+    };
+
+    let html = nonRejected.map(j => renderJobRow(j, showFeedbackBtns)).join('');
+    if (rejected.length > 0) {
+      html += `<div class="section-divider">Rejected <span class="line"></span> ${rejected.length}</div>`;
+      html += rejected.map(j => renderJobRow(j, false)).join('');
+    }
+    container.innerHTML = html;
   }
   updateStats();
 }
@@ -849,35 +963,45 @@ async function renderStats() {
 
   const applied = JOBS.filter(j => checkedIds.has(j.url));
   const appliedExt = applied.filter(j => !j.easy_apply);
-  const appliedEA = applied.filter(j => j.easy_apply);
 
-  // Group by date
+  // Group by date (only count external/VA applications for Cherry)
   const byDate = {};
   Object.entries(ts).forEach(([url, t]) => {
+    const j = JOBS.find(x => x.url === url);
+    if (j && j.easy_apply) return; // skip Easy Apply (Peter's)
     const day = t.slice(0, 10);
     byDate[day] = (byDate[day] || 0) + 1;
   });
   const sortedDays = Object.keys(byDate).sort().reverse();
+  const today = new Date().toISOString().slice(0, 10);
+  const appliedToday = byDate[today] || 0;
+  const dailyTarget = 40;
+  const progressPct = Math.min(100, Math.round((appliedToday / dailyTarget) * 100));
+  const progressColor = progressPct >= 100 ? '#27ae60' : progressPct >= 50 ? '#d4880f' : '#c0392b';
 
   // Region breakdown
   const byRegion = {};
-  applied.forEach(j => { byRegion[j.region] = (byRegion[j.region] || 0) + 1; });
+  appliedExt.forEach(j => { byRegion[j.region] = (byRegion[j.region] || 0) + 1; });
 
   content.innerHTML = `
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#333;">${applied.length}</div>
+      <div style="font-size:32px; font-weight:700; color:#333;">${appliedExt.length}</div>
       <div style="font-size:13px; color:#888;">Total Applied</div>
     </div>
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
       <div style="font-size:32px; font-weight:700; color:#c0392b;">${appliedExt.length}</div>
-      <div style="font-size:13px; color:#888;">External (VA)</div>
+      <div style="font-size:13px; color:#888;">Cherry Applied</div>
     </div>
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#27ae60;">${appliedEA.length}</div>
-      <div style="font-size:13px; color:#888;">Easy Apply (Peter)</div>
+      <div style="font-size:32px; font-weight:700; color:${progressColor};">${appliedToday} / ${dailyTarget}</div>
+      <div style="font-size:13px; color:#888;">Target: 40/day</div>
+      <div style="margin-top:8px; background:#e0e0e0; border-radius:6px; height:10px; overflow:hidden;">
+        <div style="width:${progressPct}%; height:100%; background:${progressColor}; border-radius:6px; transition:width 0.3s;"></div>
+      </div>
+      <div style="font-size:11px; color:#aaa; margin-top:4px;">${progressPct}% of daily goal (2hrs, 20/hr)</div>
     </div>
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#2980b9;">${sortedDays.length > 0 ? byDate[sortedDays[0]] : 0}</div>
+      <div style="font-size:32px; font-weight:700; color:#2980b9;">${appliedToday}</div>
       <div style="font-size:13px; color:#888;">Applied Today</div>
     </div>
   `;
@@ -977,6 +1101,7 @@ document.addEventListener('keydown', e => {
 
 // ─── Init ───
 loadChecks();
+loadFeedbackLocal();
 </script>
 <script src="jobs-data.js?v=20260330b"></script>
 </body>
