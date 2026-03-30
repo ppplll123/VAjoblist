@@ -410,6 +410,54 @@ body {
 
   .toast { font-size: 12px; padding: 8px 16px; bottom: 16px; }
 }
+/* ─── How to Use Panel ─── */
+.how-to-use-toggle {
+  display: block;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 6px 0 4px;
+  text-decoration: none;
+  font-family: 'DM Sans', sans-serif;
+  user-select: none;
+  transition: color 0.15s;
+}
+.how-to-use-toggle:hover { color: var(--text); }
+.how-to-use-panel {
+  display: none;
+  background: #fefefe;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 6px 0 10px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+}
+.how-to-use-panel.open { display: block; }
+.how-to-use-panel h4 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 12px 0 4px;
+  color: var(--text);
+}
+.how-to-use-panel h4:first-child { margin-top: 0; }
+.how-to-use-panel ol, .how-to-use-panel ul {
+  margin: 2px 0 6px 18px;
+}
+.how-to-use-panel li { margin-bottom: 3px; }
+.how-to-use-panel b { font-weight: 600; }
+.how-to-use-panel .feedback-label {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: 2px;
+}
+.how-to-use-panel .fb-wrong { background: #fde8e8; color: #c0392b; }
+.how-to-use-panel .fb-ideal { background: #e8f5e9; color: #2e7d32; }
 </style>
 </head>
 <body>
@@ -429,6 +477,39 @@ body {
       <div class="stat checked-stat">Done <b id="stat-applied">0</b></div>
       <div class="stat">Total <b id="stat-total">0</b></div>
     </div>
+  </div>
+  <a class="how-to-use-toggle" onclick="document.getElementById('how-to-use').classList.toggle('open'); this.textContent = document.getElementById('how-to-use').classList.contains('open') ? '\uD83D\uDCD6 Hide Instructions' : '\uD83D\uDCD6 How to Use This Dashboard';">&#x1F4D6; How to Use This Dashboard</a>
+  <div id="how-to-use" class="how-to-use-panel">
+    <h4>Your Workflow:</h4>
+    <ol>
+      <li>Start with <b>New (24h)</b> tab &mdash; these are freshly posted jobs from the last 24 hours with high scores</li>
+      <li>Then go to <b>Top Jobs</b> &mdash; all high-scoring jobs sorted by relevance</li>
+      <li>Check <b>Professor</b> tab &mdash; academic positions at UAE universities</li>
+      <li>Finally <b>Browse</b> for lower-scored jobs that might still be interesting</li>
+    </ol>
+    <h4>How to Apply:</h4>
+    <ul>
+      <li>Click the job title to open it on LinkedIn</li>
+      <li>After applying, click the &#9744; checkbox to mark it as done</li>
+      <li>Your target: <b>40 external applications per day</b> (see Cherry tab for your progress)</li>
+    </ul>
+    <h4>Feedback Buttons (very important!):</h4>
+    <ul>
+      <li><span class="feedback-label fb-wrong">Wrong Role</span> &mdash; if the job title doesn't match Peter's profile (e.g., HR, nursing, construction)</li>
+      <li><span class="feedback-label fb-wrong">Wrong Seniority</span> &mdash; if it's too junior (analyst, coordinator, specialist)</li>
+      <li><span class="feedback-label fb-wrong">Wrong Company</span> &mdash; if the company is irrelevant</li>
+      <li><span class="feedback-label fb-wrong">Other</span> &mdash; type your reason and press Enter (e.g., &quot;pharma - wrong industry&quot;)</li>
+      <li><span class="feedback-label fb-ideal">Ideal &#10003;</span> &mdash; if you think this is a PERFECT match for Peter. Use this for jobs at top companies (Revolut, Kraken, Binance, McKinsey) with the right seniority (Director, VP, Head of)</li>
+    </ul>
+    <p style="margin:6px 0 10px; color:var(--text2); font-size:12px;">Your feedback directly improves the AI scoring model &mdash; the more you mark, the smarter it gets!</p>
+    <h4>Tabs explained:</h4>
+    <ul>
+      <li><b>Easy Apply (Peter)</b> &mdash; these are for Peter only, don't touch</li>
+      <li><b>Cherry</b> tab &mdash; your performance stats and daily target</li>
+      <li><b>Applied</b> &mdash; jobs you've already marked as done</li>
+    </ul>
+    <h4>Filters:</h4>
+    <p>Use <b>UAE</b>, <b>Warsaw</b>, <b>Remote</b>, <b>UAE-Prof</b> buttons to narrow down by region</p>
   </div>
   <div class="tabs">
     <button class="tab new-tab active" data-tab="new">
