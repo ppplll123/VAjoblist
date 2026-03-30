@@ -459,6 +459,7 @@ body {
 
 <script>
 let JOBS = [];
+let APPLIED_COMPANIES = [];
 let checkedIds = new Set();
 let currentTab = 'new';
 let currentFilter = 'all';
@@ -466,7 +467,7 @@ let currentSearch = '';
 let sortField = 'posted';
 let sortAsc = false;
 
-// ─── Persistence ───
+// ─── Persistence (localStorage + server-side applied_companies) ───
 function loadChecks() {
   try {
     const saved = localStorage.getItem('job-pipeline-checks');
@@ -477,15 +478,22 @@ function saveChecks() {
   localStorage.setItem('job-pipeline-checks', JSON.stringify([...checkedIds]));
 }
 
-// No auto-marking — Easy Apply jobs stay in their own tab for Peter
+// Auto-mark jobs from companies we applied to (baked into JS from Gmail sync)
 function prefillEasyApply() {
-  // intentionally empty — Peter marks these manually after applying
+  // Auto-mark jobs with applied:true flag (baked in from Gmail sync during build)
+  let count = 0;
+  JOBS.forEach(j => {
+    if (j.applied && !checkedIds.has(j.url)) {
+      checkedIds.add(j.url);
+      count++;
+    }
+  });
+  if (count) saveChecks();
 }
 
 // One-time migration: clear EA jobs that were auto-checked by the old prefillEasyApply()
 function migrateEasyApplyChecks() {
   if (localStorage.getItem('job-pipeline-ea-migrated')) return;
-  // Remove all EA job URLs from checkedIds so they show up unchecked
   let changed = false;
   JOBS.forEach(j => {
     if (j.easy_apply && checkedIds.has(j.url)) {
