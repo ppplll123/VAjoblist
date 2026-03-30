@@ -151,7 +151,7 @@ body {
 .job-list { padding: 0 24px 100px; }
 .col-header {
   display: grid;
-  grid-template-columns: 42px 1fr 170px 90px 55px 80px;
+  grid-template-columns: 42px 1fr 82px 150px 70px 50px 72px;
   gap: 10px;
   padding: 8px 14px;
   font-size: 10px; font-weight: 600; color: var(--text2);
@@ -165,7 +165,7 @@ body {
 
 .job-row {
   display: grid;
-  grid-template-columns: 42px 1fr 170px 90px 55px 80px;
+  grid-template-columns: 42px 1fr 82px 150px 70px 50px 72px;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
@@ -215,6 +215,10 @@ body {
 .job-meta {
   font-size: 11px; color: var(--text2); margin-top: 2px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.job-posted {
+  font-size: 11px; color: var(--text2); font-family: 'DM Mono', monospace;
+  white-space: nowrap;
 }
 .job-location {
   font-size: 11px; color: var(--text2);
@@ -279,8 +283,9 @@ body {
 /* ─── Responsive ─── */
 /* ─── Tablet ─── */
 @media (max-width: 900px) {
-  .job-row, .col-header { grid-template-columns: 32px 1fr 80px 60px; }
+  .job-row, .col-header { grid-template-columns: 32px 1fr 82px 70px 60px; }
   .job-location, .score-bar { display: none; }
+  .col-header span:nth-child(4), .col-header span:nth-child(6) { display: none; } /* hide Location, Score headers */
   .controls-row { gap: 4px; }
   .search-box { width: 130px; }
   .tab { padding: 8px 12px; font-size: 12px; }
@@ -398,14 +403,14 @@ body {
     <button class="tab" data-tab="top">
       Top Jobs <span class="count" id="tab-top-count">0</span>
     </button>
-    <button class="tab ea-tab" data-tab="easy_apply">
-      Easy Apply <span class="count" id="tab-ea-count">0</span>
-    </button>
     <button class="tab" data-tab="browse">
       Browse <span class="count" id="tab-browse-count">0</span>
     </button>
     <button class="tab" data-tab="applied">
       Applied <span class="count" id="tab-applied-count">0</span>
+    </button>
+    <button class="tab ea-tab" data-tab="easy_apply">
+      Easy Apply <span class="count" id="tab-ea-count">0</span>
     </button>
     <button class="tab" data-tab="all">
       All <span class="count" id="tab-all-count">0</span>
@@ -441,6 +446,7 @@ body {
   <div class="col-header">
     <span onclick="toggleAllVisible()" title="Mark all as applied">VA</span>
     <span onclick="sortBy('title')">Title / Company</span>
+    <span onclick="sortBy('posted')">Posted</span>
     <span onclick="sortBy('location')">Location</span>
     <span onclick="sortBy('region')">Region</span>
     <span onclick="sortBy('score')">Score</span>
@@ -457,7 +463,7 @@ let checkedIds = new Set();
 let currentTab = 'new';
 let currentFilter = 'all';
 let currentSearch = '';
-let sortField = 'score';
+let sortField = 'posted';
 let sortAsc = false;
 
 // ─── Persistence ───
@@ -571,18 +577,22 @@ function render() {
       const regionClass = j.region.toLowerCase().replace('/', '');
       const typeLabel = j.easy_apply ? '<span class="easy-apply-tag">Easy Apply</span>' : '<span class="ext-apply-tag">External</span>';
       const newBadge = isNew ? '<span class="new-badge">new</span>' : '';
-      const posted = j.posted ? j.posted : '';
+      const posted = j.posted || '';
+      const relPosted = posted ? relativeDate(posted) : '';
       const meta = [j.company, j.salary, posted].filter(Boolean).join(' \u2022 ');
       const mobileScore = j.score >= 0.95 ? `<b class="${scoreClass}">${j.score.toFixed(2)}</b>` : '';
       const mobileTags = `<span class="mobile-tags"><span class="region-tag ${regionClass}">${j.region}</span>${mobileScore}${typeLabel}</span>`;
+      // Deep link to LinkedIn iOS app for Easy Apply jobs
+      const jobUrl = j.easy_apply ? j.url.replace('https://','linkedin://').replace('http://','linkedin://') : j.url;
 
       return `
         <div class="job-row ${isChecked ? 'checked' : ''} ${isNew ? 'is-new' : ''}">
           <div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${j.url.replace(/'/g, "\\'")}')"></div>
           <div>
-            <a class="job-title-link" href="${j.url}" target="_blank">${esc(j.title)}${newBadge}</a>
+            <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}</a>
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
           </div>
+          <div class="job-posted">${relPosted}</div>
           <div class="job-location">${esc(j.location)}</div>
           <div><span class="region-tag ${regionClass}">${j.region}</span></div>
           <div class="score-bar ${scoreClass}">${j.score.toFixed(2)}</div>
@@ -594,6 +604,22 @@ function render() {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function relativeDate(dateStr) {
+  if (!dateStr) return '';
+  const now = new Date();
+  const d = new Date(dateStr + 'T12:00:00');
+  const diffMs = now - d;
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffD = Math.floor(diffMs / 86400000);
+  if (diffD < 0) return 'future';
+  if (diffH < 1) return 'now';
+  if (diffH < 24) return diffH + 'h ago';
+  if (diffD === 1) return '1d ago';
+  if (diffD < 7) return diffD + 'd ago';
+  if (diffD < 30) return Math.floor(diffD / 7) + 'w ago';
+  return Math.floor(diffD / 30) + 'mo ago';
+}
 
 // ─── Actions ───
 function toggleCheck(e, url) {
@@ -688,6 +714,12 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentTab = btn.dataset.tab;
+    // Default sort: New/Top by posted date (newest first), others by score
+    if (currentTab === 'new' || currentTab === 'top') {
+      sortField = 'posted'; sortAsc = false;
+    } else if (currentTab === 'easy_apply' || currentTab === 'browse') {
+      sortField = 'score'; sortAsc = false;
+    }
     render();
   });
 });
