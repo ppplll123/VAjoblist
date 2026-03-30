@@ -478,6 +478,14 @@ body {
       <div style="font-size:11px; color:#888; font-family:'DM Mono',monospace; margin-top:4px; line-height:1.4;">
         &#x1F352; <b style="color:#c0392b;">Cherry</b> — <b style="color:var(--new-green);">New (24h)</b> → <b>Top Jobs</b> → <b style="color:#673ab7;">Professor</b> → <b>Browse</b> | <span style="display:inline-block;width:11px;height:11px;border:2px solid #ccc;border-radius:2px;vertical-align:middle;"></span> = applied | <span style="background:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:10px;">Ideal</span> <span style="background:#f5f5f5;padding:1px 4px;border-radius:3px;font-size:10px;">Wrong</span> = improve AI
       </div>
+      <div id="cherry-progress-header" style="margin-top:6px; display:none;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:12px; font-family:'DM Mono',monospace;">&#x1F352; <b style="color:#2e7d32;" id="cherry-today-header">0</b><span style="color:#888;">/40 today</span></span>
+          <div style="flex:1; max-width:120px; height:6px; background:#e0e0e0; border-radius:3px; overflow:hidden;">
+            <div id="cherry-bar-header" style="height:100%; background:#2e7d32; border-radius:3px; width:0%; transition:width 0.3s;"></div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="stats-bar">
       <div class="stat new-stat">New <b id="stat-new">0</b></div>
@@ -1227,6 +1235,16 @@ async function renderStats() {
   const dailyTarget = 40;
   const progressPct = Math.min(100, Math.round((cherryToday / dailyTarget) * 100));
   const progressColor = progressPct >= 100 ? '#27ae60' : progressPct >= 50 ? '#d4880f' : '#c0392b';
+
+  // Update header progress bar (always visible)
+  const hdrEl = document.getElementById('cherry-progress-header');
+  if (hdrEl) {
+    hdrEl.style.display = '';
+    document.getElementById('cherry-today-header').textContent = cherryToday;
+    document.getElementById('cherry-today-header').style.color = progressColor;
+    document.getElementById('cherry-bar-header').style.width = progressPct + '%';
+    document.getElementById('cherry-bar-header').style.background = progressColor;
+  }
 
   // Region breakdown
   const byRegion = {};
