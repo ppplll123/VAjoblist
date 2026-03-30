@@ -624,12 +624,21 @@ async function loadFromServer() {
     });
     if (!res.ok) return;
     const data = await res.json();
-    const serverUrls = data.record?.urls || [];
+    const record = data.record || {};
+    // JSONBin is source of truth — replace localStorage with server state
+    const serverUrls = record.urls || [];
+    serverTimestamps = record.timestamps || {};
+    // Merge: server URLs + local URLs (union — never lose a checkmark)
     let changed = false;
     serverUrls.forEach(url => {
       if (!checkedIds.has(url)) { checkedIds.add(url); changed = true; }
     });
-    if (changed) { saveLocal(); render(); }
+    // Also load feedback from server (merge with local)
+    const serverFeedback = record.feedback || {};
+    Object.entries(serverFeedback).forEach(([url, fb]) => {
+      if (!feedbackData[url]) { feedbackData[url] = fb; changed = true; }
+    });
+    if (changed) { saveLocal(); saveFeedbackLocal(); render(); }
   } catch(e) { /* offline is fine, localStorage has backup */ }
 }
 
