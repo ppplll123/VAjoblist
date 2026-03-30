@@ -415,7 +415,19 @@ body {
     <button class="tab" data-tab="all">
       All <span class="count" id="tab-all-count">0</span>
     </button>
+    <button class="tab" data-tab="stats">
+      Stats
+    </button>
   </div>
+</div>
+
+<!-- Stats panel (hidden by default, shown when Stats tab active) -->
+<div id="stats-panel" style="display:none; padding: 20px;">
+  <h3 style="margin:0 0 16px; font-size:18px;">VA Performance</h3>
+  <div id="stats-content" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+  </div>
+  <h3 style="margin:24px 0 12px; font-size:16px;">Recent Applications</h3>
+  <div id="stats-recent" style="font-size:13px;"></div>
 </div>
 
 <div class="controls-row">
@@ -509,17 +521,35 @@ function saveChecks() {
   syncTimeout = setTimeout(syncToServer, 2000);
 }
 
+let serverTimestamps = {};  // preserved across syncs
+
 async function syncToServer() {
   try {
-    const timestamps = {};
+    // First read existing timestamps so we don't overwrite them
+    if (Object.keys(serverTimestamps).length === 0) {
+      try {
+        const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+          headers: { 'X-Access-Key': JSONBIN_KEY }
+        });
+        if (r.ok) {
+          const d = await r.json();
+          serverTimestamps = d.record?.timestamps || {};
+        }
+      } catch(e) {}
+    }
+    // Only set timestamp for NEW clicks (not already tracked)
+    const now = new Date().toISOString();
     checkedIds.forEach(url => {
-      const j = JOBS.find(x => x.url === url);
-      if (j) timestamps[url] = new Date().toISOString();
+      if (!serverTimestamps[url]) serverTimestamps[url] = now;
+    });
+    // Remove unchecked URLs from timestamps
+    Object.keys(serverTimestamps).forEach(url => {
+      if (!checkedIds.has(url)) delete serverTimestamps[url];
     });
     await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_KEY },
-      body: JSON.stringify({ urls: [...checkedIds], timestamps, last_updated: new Date().toISOString() })
+      body: JSON.stringify({ urls: [...checkedIds], timestamps: serverTimestamps, last_updated: now })
     });
   } catch(e) { /* offline is fine */ }
 }
@@ -611,6 +641,19 @@ function getFilteredJobs() {
 // ─── Render ───
 function render() {
   const container = document.getElementById('jobs');
+  const statsPanel = document.getElementById('stats-panel');
+
+  // Stats tab: show stats panel, hide jobs
+  if (currentTab === 'stats') {
+    container.style.display = 'none';
+    statsPanel.style.display = 'block';
+    renderStats();
+    updateStats([]);
+    return;
+  }
+  container.style.display = '';
+  statsPanel.style.display = 'none';
+
   const filtered = getFilteredJobs();
   const latestBatch = getLatestBatch();
 
@@ -777,6 +820,109 @@ function shareApplied() {
     a.click();
     showToast(`Downloaded ${checks.length} applied jobs as JSON`);
   });
+}
+
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+async function renderStats() {
+  const content = document.getElementById('stats-content');
+  const recent = document.getElementById('stats-recent');
+
+  // Get timestamps from server
+  let ts = serverTimestamps;
+  if (Object.keys(ts).length === 0) {
+    try {
+      const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+        headers: { 'X-Access-Key': JSONBIN_KEY }
+      });
+      if (r.ok) { const d = await r.json(); ts = d.record?.timestamps || {}; }
+    } catch(e) {}
+  }
+
+  const applied = JOBS.filter(j => checkedIds.has(j.url));
+  const appliedExt = applied.filter(j => !j.easy_apply);
+  const appliedEA = applied.filter(j => j.easy_apply);
+
+  // Group by date
+  const byDate = {};
+  Object.entries(ts).forEach(([url, t]) => {
+    const day = t.slice(0, 10);
+    byDate[day] = (byDate[day] || 0) + 1;
+  });
+  const sortedDays = Object.keys(byDate).sort().reverse();
+
+  // Region breakdown
+  const byRegion = {};
+  applied.forEach(j => { byRegion[j.region] = (byRegion[j.region] || 0) + 1; });
+
+  content.innerHTML = `
+    <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
+      <div style="font-size:32px; font-weight:700; color:#333;">${applied.length}</div>
+      <div style="font-size:13px; color:#888;">Total Applied</div>
+    </div>
+    <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
+      <div style="font-size:32px; font-weight:700; color:#c0392b;">${appliedExt.length}</div>
+      <div style="font-size:13px; color:#888;">External (VA)</div>
+    </div>
+    <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
+      <div style="font-size:32px; font-weight:700; color:#27ae60;">${appliedEA.length}</div>
+      <div style="font-size:13px; color:#888;">Easy Apply (Peter)</div>
+    </div>
+    <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
+      <div style="font-size:32px; font-weight:700; color:#2980b9;">${sortedDays.length > 0 ? byDate[sortedDays[0]] : 0}</div>
+      <div style="font-size:13px; color:#888;">Applied Today</div>
+    </div>
+  `;
+
+  // Daily breakdown
+  const dailyRows = sortedDays.slice(0, 7).map(day =>
+    `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
+      <span>${day}</span>
+      <span style="font-weight:600;">${byDate[day]} jobs</span>
+    </div>`
+  ).join('');
+
+  // Region breakdown
+  const regionRows = Object.entries(byRegion).sort((a,b) => b[1]-a[1]).map(([r, c]) =>
+    `<span style="display:inline-block; background:#f0f0f0; padding:4px 10px; border-radius:12px; margin:3px; font-size:12px;">${r}: ${c}</span>`
+  ).join('');
+
+  // Recent applications (last 10)
+  const recentApplied = Object.entries(ts)
+    .sort((a, b) => b[1].localeCompare(a[1]))
+    .slice(0, 10)
+    .map(([url, t]) => {
+      const j = JOBS.find(x => x.url === url);
+      const name = j ? `${j.title.slice(0, 40)} — ${j.company}` : url.slice(0, 50);
+      const ago = timeAgo(t);
+      return `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+        <span>${name}</span>
+        <span style="color:#888; font-size:12px; white-space:nowrap; margin-left:12px;">${ago}</span>
+      </div>`;
+    }).join('');
+
+  recent.innerHTML = `
+    <div style="margin-bottom:20px;">
+      <h4 style="margin:0 0 8px; font-size:14px; color:#666;">Daily Breakdown</h4>
+      ${dailyRows || '<div style="color:#aaa;">No timestamped data yet</div>'}
+    </div>
+    <div style="margin-bottom:20px;">
+      <h4 style="margin:0 0 8px; font-size:14px; color:#666;">By Region</h4>
+      ${regionRows || '<div style="color:#aaa;">No data</div>'}
+    </div>
+    <div>
+      <h4 style="margin:0 0 8px; font-size:14px; color:#666;">Recent Applications</h4>
+      ${recentApplied || '<div style="color:#aaa;">No timestamped applications yet</div>'}
+    </div>
+  `;
 }
 
 function showToast(msg) {
