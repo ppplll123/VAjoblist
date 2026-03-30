@@ -528,9 +528,14 @@ body {
     <p>Use <b>UAE</b>, <b>Warsaw</b>, <b>Remote</b>, <b>UAE-Prof</b> buttons to narrow down by region</p>
     <h4>Job Sources:</h4>
     <p style="font-size:12px; line-height:1.6;">
-      <span style="background:#e3f2fd;color:#2164f3;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">INMCP</span> Indeed via MCP API &nbsp;
-      <span style="background:#fff3e0;color:#ff6f00;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">INJS</span> Indeed via JobSpy (auto-cron) &nbsp;
-      <span style="background:#e3f2fd;color:#0a66c2;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">LI</span> LinkedIn
+      <span style="background:#e3f2fd;color:#0a66c2;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">LI</span> LinkedIn &nbsp;
+      <span style="background:#e3f2fd;color:#2164f3;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">INMCP</span> Indeed MCP &nbsp;
+      <span style="background:#fff3e0;color:#ff6f00;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">INJS</span> Indeed JobSpy &nbsp;
+      <span style="background:#e8f5e9;color:#2e7d32;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">GH</span> Greenhouse &nbsp;
+      <span style="background:#fce4ec;color:#c62828;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">LV</span> Lever &nbsp;
+      <span style="background:#f3e5f5;color:#7b1fa2;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">AB</span> Ashby &nbsp;
+      <span style="background:#e0f7fa;color:#00838f;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">SR</span> SmartRecruiters &nbsp;
+      <span style="background:#fff8e1;color:#f57f17;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">AZ</span> Amazon
     </p>
     <h4 style="margin-top:12px;">Audio Instructions:</h4>
     <div style="display:flex; gap:12px; flex-wrap:wrap;">
@@ -1042,6 +1047,11 @@ function render() {
       const srcBadges = {
         'indeed': '<span class="source-badge" style="background:#e3f2fd;color:#2164f3;">INMCP</span>',
         'jobspy': '<span class="source-badge" style="background:#fff3e0;color:#ff6f00;">INJS</span>',
+        'greenhouse': '<span class="source-badge" style="background:#e8f5e9;color:#2e7d32;">GH</span>',
+        'lever': '<span class="source-badge" style="background:#fce4ec;color:#c62828;">LV</span>',
+        'ashby': '<span class="source-badge" style="background:#f3e5f5;color:#7b1fa2;">AB</span>',
+        'smartrecruiters': '<span class="source-badge" style="background:#e0f7fa;color:#00838f;">SR</span>',
+        'amazon': '<span class="source-badge" style="background:#fff8e1;color:#f57f17;">AZ</span>',
       };
       const srcBadge = srcBadges[j.source] || '<span class="source-badge source-li">LI</span>';
       const typeLabel = j.easy_apply ? `${srcBadge}<span class="easy-apply-tag">Easy Apply</span>` : `${srcBadge}<span class="ext-apply-tag">External</span>`;
