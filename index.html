@@ -646,6 +646,7 @@ let JOBS = [];
 let APPLIED_COMPANIES = [];
 let checkedIds = new Set();
 let feedbackData = {};  // { url: { reason, timestamp } }
+let emailCounter = 0;  // auto-incrementing email counter for Cherry applications
 let currentTab = 'new';
 let currentFilter = 'all';
 let currentSearch = '';
@@ -744,6 +745,15 @@ async function loadFromServer() {
     // JSONBin is source of truth — replace localStorage with server state
     const serverUrls = record.urls || [];
     serverTimestamps = record.timestamps || {};
+    // Initialize emailCounter from highest existing emailNum
+    let maxEmail = 0;
+    Object.values(serverTimestamps).forEach(v => {
+      if (v && typeof v === 'object' && v.emailNum) {
+        const n = parseInt(v.emailNum, 10);
+        if (n > maxEmail) maxEmail = n;
+      }
+    });
+    emailCounter = maxEmail;
     // Merge: server URLs + local URLs (union — never lose a checkmark)
     let changed = false;
     serverUrls.forEach(url => {
@@ -1127,6 +1137,10 @@ function render() {
           ${eaButtons}
           <div>
             <a class="job-title-link" href="${jobUrl}" target="_blank" rel="noopener">${esc(j.title)}${newBadge}${idealBadge}${rejBadge}</a>
+            ${isChecked ? (() => {
+              const emailNum = getEmailForJob(j.url);
+              return emailNum ? `<div style="font-size:10px; color:#1565c0; margin-top:1px; cursor:pointer; user-select:all;" title="Click to copy email" data-action="copy-email" data-email="${esc(generateEmail(emailNum))}">📧 ${esc(generateEmail(emailNum))}</div>` : '';
+            })() : ''}
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
             ${j.ai_reasoning ? `<div style="font-size:11px; color:#888; margin-top:2px; font-style:italic; line-height:1.3;">${j.work_mode && j.work_mode !== 'unknown' ? `<span style="background:${j.work_mode === 'remote' ? '#e8f5e9' : j.work_mode === 'hybrid' ? '#fff3e0' : '#fde8e8'};color:${j.work_mode === 'remote' ? '#2e7d32' : j.work_mode === 'hybrid' ? '#e65100' : '#c62828'};padding:1px 4px;border-radius:3px;font-size:9px;font-weight:600;font-style:normal;margin-right:4px;">${j.work_mode.toUpperCase()}</span>` : ''}${esc(j.ai_reasoning)}</div>` : ''}
           </div>
@@ -1162,6 +1176,21 @@ function render() {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// Email pattern for Cherry applications
+function getNextEmailNumber() {
+  emailCounter++;
+  return String(emailCounter).padStart(3, '0');
+}
+function generateEmail(num) {
+  return `peter.lewinski.work+${num}thisistop1profileforthisrole@gmail.com`;
+}
+function getEmailForJob(url) {
+  // Check if this job already has an assigned email number in JSONBin
+  const ts = serverTimestamps[normUrl(url)];
+  if (ts && ts.emailNum) return ts.emailNum;
+  return null;
+}
 function escUrl(url) {
   if (typeof url !== 'string') return '';
   const trimmed = url.trim();
@@ -1188,8 +1217,22 @@ function relativeDate(dateStr) {
 // ─── Actions ───
 function toggleCheck(e, url) {
   e.stopPropagation();
-  if (checkedIds.has(url)) checkedIds.delete(url);
-  else checkedIds.add(url);
+  if (checkedIds.has(url)) {
+    checkedIds.delete(url);
+  } else {
+    checkedIds.add(url);
+    // Assign email number when checking (applying)
+    const nUrl = normUrl(url);
+    if (!serverTimestamps[nUrl] || !serverTimestamps[nUrl].emailNum) {
+      const num = getNextEmailNumber();
+      if (!serverTimestamps[nUrl]) serverTimestamps[nUrl] = Date.now();
+      if (typeof serverTimestamps[nUrl] === 'number') {
+        serverTimestamps[nUrl] = { ts: serverTimestamps[nUrl], emailNum: num };
+      } else {
+        serverTimestamps[nUrl].emailNum = num;
+      }
+    }
+  }
   saveChecks();
   render();
 }
@@ -1494,6 +1537,13 @@ document.addEventListener('click', function(e) {
   else if (action === 'feedback') { submitFeedback(url, el.dataset.reason); }
   else if (action === 'show-other') { showOtherInput(el, url); }
   else if (action === 'show-ideal') { showIdealInput(el, url); }
+  else if (action === 'copy-email') {
+    const email = el.dataset.email;
+    navigator.clipboard.writeText(email).then(() => {
+      el.textContent = '✅ Copied!';
+      setTimeout(() => { el.textContent = '📧 ' + email; }, 1500);
+    });
+  }
 });
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Enter') return;
