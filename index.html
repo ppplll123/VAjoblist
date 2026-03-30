@@ -648,12 +648,14 @@ function submitFeedback(url, reason, detail) {
   feedbackData[url] = entry;
   saveFeedback();
   render();
-  const labels = { role: 'Wrong Role', seniority: 'Wrong Seniority', company: 'Wrong Company', other: 'Other' };
-  showToast(`Marked as "${labels[reason]}${detail ? ': ' + detail : ''}"`);
+  const labels = { ideal: 'Ideal ✅', role: 'Wrong Role', seniority: 'Wrong Seniority', company: 'Wrong Company', other: 'Other' };
+  showToast(`Marked as "${labels[reason] || reason}${detail ? ': ' + detail : ''}"`);
 }
 
 function isRejected(url) {
-  return !!feedbackData[url];
+  const fb = feedbackData[url];
+  if (!fb) return false;
+  return fb.reason !== 'ideal';  // "Ideal" is positive feedback, not a rejection
 }
 
 function showOtherInput(btn, url) {
@@ -851,6 +853,7 @@ function render() {
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','seniority')">Wrong Seniority</button>
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','company')">Wrong Company</button>
           <button class="fb-btn" onclick="showOtherInput(this,'${escapedUrl}')">Other</button>
+          <button class="fb-btn fb-ideal" onclick="submitFeedback('${escapedUrl}','ideal')" style="background:#e8f5e9; border-color:#4caf50; color:#2e7d32;">Ideal</button>
           <input class="fb-other-input" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid var(--border); border-radius:4px; width:140px; outline:none;" placeholder="Type reason + Enter" onkeydown="if(event.key==='Enter'){submitFeedback('${escapedUrl}','other',this.value);}" />
         </div>`;
       }
