@@ -719,7 +719,7 @@ function getFilteredJobs() {
     const isEA = !!j.easy_apply;
     const isTop = j.score >= 0.9;
 
-    if (currentTab === 'new' && (!isNew || isEA)) return false;                 // Jobs posted in last 24hrs (external only)
+    if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;        // Jobs posted in last 24hrs, score ≥ 0.9, external only
     if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
     if (currentTab === 'easy_apply' && !isEA) return false;                    // All Easy Apply jobs (Peter) — checked shown crossed out at bottom
     if (currentTab === 'applied' && (!isChecked || isEA)) return false;        // Cherry applied only (external, not EA)
@@ -896,7 +896,7 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(j.url) && !j.easy_apply);
+  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(j.url) && j.score >= 0.9 && !j.easy_apply);
   const topJobs = JOBS.filter(j => j.score >= 0.9 && !checkedIds.has(j.url) && !j.easy_apply);
   const allEA = JOBS.filter(j => j.easy_apply);
   const eaUnchecked = allEA.filter(j => !checkedIds.has(j.url));
