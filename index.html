@@ -1111,22 +1111,22 @@ function render() {
       const meta = [j.company, j.salary, posted].filter(Boolean).join(' \u2022 ');
       const mobileScore = j.score > 0 ? `<b class="${scoreClass}">${j.score.toFixed(2)}</b>` : '';
       const mobileTags = `<span class="mobile-tags"><span class="region-tag ${regionClass}">${j.region}</span>${mobileScore}${typeLabel}</span>`;
-      const jobUrl = j.url;
-      const escapedUrl = j.url.replace(/'/g, "\\'");
+      const jobUrl = escUrl(j.url) || '#';
+      const safeUrlAttr = esc(j.url);
       const rowClass = `job-row ${isChecked ? 'checked' : ''} ${isNew ? 'is-new' : ''} ${rej ? 'rejected' : ''}`;
 
       // EA tab: show A/R buttons instead of checkbox
       const eaButtons = (currentTab === 'easy_apply' && !isChecked && !rej) ? `
           <div style="display:flex; gap:4px; flex-direction:column; align-items:center;">
-            <button onclick="eaApply(this,'${escapedUrl}')" style="width:28px;height:22px;border:1px solid #4caf50;background:#e8f5e9;color:#2e7d32;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Applied">A</button>
-            <button onclick="showEaRejectInput(this,'${escapedUrl}')" style="width:28px;height:22px;border:1px solid #e57373;background:#fce4e4;color:#c62828;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Rejected (type reason)">R</button>
-          </div>` : `<div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${escapedUrl}')"></div>`;
+            <button data-action="ea-apply" data-url="${safeUrlAttr}" style="width:28px;height:22px;border:1px solid #4caf50;background:#e8f5e9;color:#2e7d32;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Applied">A</button>
+            <button data-action="ea-reject" data-url="${safeUrlAttr}" style="width:28px;height:22px;border:1px solid #e57373;background:#fce4e4;color:#c62828;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Rejected (type reason)">R</button>
+          </div>` : `<div class="check ${isChecked ? 'on' : ''}" data-action="toggle-check" data-url="${safeUrlAttr}"></div>`;
 
       let html = `
         <div class="${rowClass}">
           ${eaButtons}
           <div>
-            <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}${idealBadge}${rejBadge}</a>
+            <a class="job-title-link" href="${jobUrl}" target="_blank" rel="noopener">${esc(j.title)}${newBadge}${idealBadge}${rejBadge}</a>
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
             ${j.ai_reasoning ? `<div style="font-size:11px; color:#888; margin-top:2px; font-style:italic; line-height:1.3;">${j.work_mode && j.work_mode !== 'unknown' ? `<span style="background:${j.work_mode === 'remote' ? '#e8f5e9' : j.work_mode === 'hybrid' ? '#fff3e0' : '#fde8e8'};color:${j.work_mode === 'remote' ? '#2e7d32' : j.work_mode === 'hybrid' ? '#e65100' : '#c62828'};padding:1px 4px;border-radius:3px;font-size:9px;font-weight:600;font-style:normal;margin-right:4px;">${j.work_mode.toUpperCase()}</span>` : ''}${esc(j.ai_reasoning)}</div>` : ''}
           </div>
@@ -1137,14 +1137,15 @@ function render() {
           <div>${typeLabel}</div>
         </div>`;
       if (showFb && !rej && !isChecked && !isIdeal) {
-        html += `<div class="feedback-row" id="fb-row-${escapedUrl.replace(/[^a-zA-Z0-9]/g,'_')}">
-          <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','role')">Wrong Role</button>
-          <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','seniority')">Wrong Seniority</button>
-          <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','company')">Wrong Company</button>
-          <button class="fb-btn" onclick="showOtherInput(this,'${escapedUrl}')">Other</button>
-          <input class="fb-other-input" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid var(--border); border-radius:4px; width:140px; outline:none;" placeholder="Why wrong? + Enter" onkeydown="if(event.key==='Enter'){submitFeedback('${escapedUrl}','other',this.value);}" />
-          <button class="fb-btn fb-ideal" onclick="showIdealInput(this,'${escapedUrl}')" style="background:#e8f5e9; border-color:#4caf50; color:#2e7d32;">Ideal</button>
-          <input class="fb-ideal-input" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid #4caf50; border-radius:4px; width:140px; outline:none; background:#f1f8e9;" placeholder="Why ideal? + Enter" onkeydown="if(event.key==='Enter'){submitFeedback('${escapedUrl}','ideal',this.value);}" />
+        const fbRowId = 'fb-row-' + j.url.replace(/[^a-zA-Z0-9]/g,'_');
+        html += `<div class="feedback-row" id="${esc(fbRowId)}">
+          <button class="fb-btn" data-action="feedback" data-url="${safeUrlAttr}" data-reason="role">Wrong Role</button>
+          <button class="fb-btn" data-action="feedback" data-url="${safeUrlAttr}" data-reason="seniority">Wrong Seniority</button>
+          <button class="fb-btn" data-action="feedback" data-url="${safeUrlAttr}" data-reason="company">Wrong Company</button>
+          <button class="fb-btn" data-action="show-other" data-url="${safeUrlAttr}">Other</button>
+          <input class="fb-other-input" data-url="${safeUrlAttr}" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid var(--border); border-radius:4px; width:140px; outline:none;" placeholder="Why wrong? + Enter" />
+          <button class="fb-btn fb-ideal" data-action="show-ideal" data-url="${safeUrlAttr}" style="background:#e8f5e9; border-color:#4caf50; color:#2e7d32;">Ideal</button>
+          <input class="fb-ideal-input" data-url="${safeUrlAttr}" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid #4caf50; border-radius:4px; width:140px; outline:none; background:#f1f8e9;" placeholder="Why ideal? + Enter" />
         </div>`;
       }
       return html;
@@ -1161,6 +1162,12 @@ function render() {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escUrl(url) {
+  if (typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return '';
+  return trimmed.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 function relativeDate(dateStr) {
   if (!dateStr) return '';
@@ -1399,8 +1406,9 @@ async function renderStats() {
       const fixedUrl = fixJobUrl(url);
       const name = j ? `${j.title.slice(0, 40)} — ${j.company}` : extractJobTitle(url);
       const ago = timeAgo(t);
+      const safeHref = escUrl(fixedUrl) || '#';
       return `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f0f0f0;">
-        <a href="${fixedUrl}" target="_blank" style="color:var(--text); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${fixedUrl}">${name}</a>
+        <a href="${safeHref}" target="_blank" rel="noopener" style="color:var(--text); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(fixedUrl)}">${esc(name)}</a>
         <span style="color:#888; font-size:12px; white-space:nowrap; margin-left:12px;">${ago}</span>
       </div>`;
     }).join('');
@@ -1471,6 +1479,29 @@ document.addEventListener('keydown', e => {
     document.getElementById('search').value = '';
     currentSearch = '';
     render();
+  }
+});
+
+// ─── Event delegation for data-action buttons (avoids inline onclick with URLs) ───
+document.addEventListener('click', function(e) {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const action = el.dataset.action;
+  const url = el.dataset.url;
+  if (action === 'ea-apply') { eaApply(el, url); }
+  else if (action === 'ea-reject') { showEaRejectInput(el, url); }
+  else if (action === 'toggle-check') { toggleCheck(e, url); }
+  else if (action === 'feedback') { submitFeedback(url, el.dataset.reason); }
+  else if (action === 'show-other') { showOtherInput(el, url); }
+  else if (action === 'show-ideal') { showIdealInput(el, url); }
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  const el = e.target;
+  if (el.classList.contains('fb-other-input') && el.dataset.url) {
+    submitFeedback(el.dataset.url, 'other', el.value);
+  } else if (el.classList.contains('fb-ideal-input') && el.dataset.url) {
+    submitFeedback(el.dataset.url, 'ideal', el.value);
   }
 });
 
