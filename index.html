@@ -1064,10 +1064,11 @@ async function renderStats() {
     return parts[parts.length - 1]?.replace(/-/g, ' ')?.slice(0, 50) || url.slice(0, 50);
   }
   const recentApplied = Object.entries(ts)
+    .filter(([url]) => { const j = JOBS.find(x => x.url === normUrl(url)); return !j || !j.easy_apply; })
     .sort((a, b) => b[1].localeCompare(a[1]))
     .slice(0, 10)
     .map(([url, t]) => {
-      const j = JOBS.find(x => x.url === url);
+      const j = JOBS.find(x => x.url === normUrl(url));
       const fixedUrl = fixJobUrl(url);
       const name = j ? `${j.title.slice(0, 40)} — ${j.company}` : extractJobTitle(url);
       const ago = timeAgo(t);
