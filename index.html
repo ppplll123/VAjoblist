@@ -393,7 +393,10 @@ body {
   </div>
   <div class="tabs">
     <button class="tab new-tab active" data-tab="new">
-      <span class="pulse-dot"></span> New Today <span class="count" id="tab-new-count">0</span>
+      <span class="pulse-dot"></span> New <span class="count" id="tab-new-count">0</span>
+    </button>
+    <button class="tab" data-tab="top">
+      Top Jobs <span class="count" id="tab-top-count">0</span>
     </button>
     <button class="tab ea-tab" data-tab="easy_apply">
       Easy Apply <span class="count" id="tab-ea-count">0</span>
@@ -515,11 +518,11 @@ function getFilteredJobs() {
     const isChecked = checkedIds.has(j.url);
     const isNew = j.scraped_at === latestBatch && !isChecked;
     const isEA = !!j.easy_apply;
-
     const isTop = j.score >= 0.9;
 
-    if (currentTab === 'new' && (!isNew || isEA || !isTop)) return false;      // New external top jobs
-    if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;     // Unchecked Easy Apply
+    if (currentTab === 'new' && (!isNew || !isTop)) return false;              // New top jobs (EA + External)
+    if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
+    if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;     // Unchecked Easy Apply (for Peter)
     if (currentTab === 'applied' && !isChecked) return false;                  // All checked
     if (currentTab === 'browse' && (isTop || isChecked)) return false;         // Lower score unchecked jobs
     // 'all' shows everything
@@ -603,7 +606,8 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && !j.easy_apply && j.score >= 0.9);
+  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && j.score >= 0.9);
+  const topJobs = JOBS.filter(j => j.score >= 0.9 && !checkedIds.has(j.url) && !j.easy_apply);
   const eaJobs = JOBS.filter(j => j.easy_apply && !checkedIds.has(j.url));
   const applied = JOBS.filter(j => checkedIds.has(j.url));
   const browse = JOBS.filter(j => j.score < 0.9 && !checkedIds.has(j.url));
@@ -614,6 +618,7 @@ function updateStats() {
   document.getElementById('stat-total').textContent = JOBS.length;
 
   document.getElementById('tab-new-count').textContent = newJobs.length;
+  document.getElementById('tab-top-count').textContent = topJobs.length;
   document.getElementById('tab-ea-count').textContent = eaJobs.length;
   document.getElementById('tab-applied-count').textContent = applied.length;
   document.getElementById('tab-browse-count').textContent = browse.length;
@@ -715,6 +720,6 @@ document.addEventListener('keydown', e => {
 // ─── Init ───
 loadChecks();
 </script>
-<script src="jobs-data.js"></script>
+<script src="jobs-data.js?v=20260330b"></script>
 </body>
 </html>
