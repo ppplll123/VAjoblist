@@ -730,25 +730,10 @@ function saveFeedbackLocal() {
 let feedbackSyncTimeout = null;
 function saveFeedback() {
   saveFeedbackLocal();
-  clearTimeout(feedbackSyncTimeout);
-  feedbackSyncTimeout = setTimeout(syncFeedbackToServer, 2000);
-}
-
-async function syncFeedbackToServer() {
-  try {
-    const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-      headers: { 'X-Access-Key': JSONBIN_KEY }
-    });
-    let existing = {};
-    if (r.ok) { const d = await r.json(); existing = d.record || {}; }
-    existing.feedback = feedbackData;
-    existing.last_updated = new Date().toISOString();
-    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_KEY },
-      body: JSON.stringify(existing)
-    });
-  } catch(e) {}
+  // Reuse the same sync as checkedIds — syncToServer() already sends feedbackData
+  // This prevents the race condition where two separate PUTs overwrite each other
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(syncToServer, 2000);
 }
 
 function submitFeedback(url, reason, detail) {
