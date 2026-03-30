@@ -599,6 +599,11 @@ body {
   <button class="filter-btn" data-filter="linkedin" style="color:#0a66c2;">LI</button>
   <button class="filter-btn" data-filter="indeed_mcp" style="color:#2164f3;">INMCP</button>
   <button class="filter-btn" data-filter="jobspy" style="color:#ff6f00;">INJS</button>
+  <button class="filter-btn" data-filter="greenhouse" style="color:#2e7d32;">GH</button>
+  <button class="filter-btn" data-filter="lever" style="color:#c62828;">LV</button>
+  <button class="filter-btn" data-filter="ashby" style="color:#7b1fa2;">AB</button>
+  <button class="filter-btn" data-filter="smartrecruiters" style="color:#00838f;">SR</button>
+  <button class="filter-btn" data-filter="amazon" style="color:#f57f17;">AZ</button>
   <input class="search-box" placeholder="Search title, company..." id="search" />
   <select class="mobile-sort" id="mobile-sort" onchange="mobileSortChange(this.value)">
     <option value="score-desc">Score (high)</option>
@@ -945,7 +950,12 @@ function getFilteredJobs() {
     if (currentFilter === 'linkedin' && j.source !== 'linkedin' && j.source !== undefined) return false;
     if (currentFilter === 'indeed_mcp' && j.source !== 'indeed') return false;
     if (currentFilter === 'jobspy' && j.source !== 'jobspy') return false;
-    if (!['all', 'easy_apply', 'external', 'prof', 'linkedin', 'indeed_mcp', 'jobspy'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
+    if (currentFilter === 'greenhouse' && j.source !== 'greenhouse') return false;
+    if (currentFilter === 'lever' && j.source !== 'lever') return false;
+    if (currentFilter === 'ashby' && j.source !== 'ashby') return false;
+    if (currentFilter === 'smartrecruiters' && j.source !== 'smartrecruiters') return false;
+    if (currentFilter === 'amazon' && j.source !== 'amazon') return false;
+    if (!['all', 'easy_apply', 'external', 'prof', 'linkedin', 'indeed_mcp', 'jobspy', 'greenhouse', 'lever', 'ashby', 'smartrecruiters', 'amazon'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
 
     // Search
     if (currentSearch) {
