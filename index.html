@@ -526,7 +526,7 @@ function getFilteredJobs() {
     const isEA = !!j.easy_apply;
     const isTop = j.score >= 0.9;
 
-    if (currentTab === 'new' && (!isNew || !isTop)) return false;              // New top jobs (EA + External)
+    if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;      // New top external jobs (for VA)
     if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
     if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;     // Unchecked Easy Apply (for Peter)
     if (currentTab === 'applied' && !isChecked) return false;                  // All checked
@@ -632,7 +632,7 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && j.score >= 0.9);
+  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && j.score >= 0.9 && !j.easy_apply);
   const topJobs = JOBS.filter(j => j.score >= 0.9 && !checkedIds.has(j.url) && !j.easy_apply);
   const eaJobs = JOBS.filter(j => j.easy_apply && !checkedIds.has(j.url));
   const applied = JOBS.filter(j => checkedIds.has(j.url));
