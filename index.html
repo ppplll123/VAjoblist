@@ -439,6 +439,7 @@ body {
   </select>
   <span class="spacer"></span>
   <button class="action-btn outline" onclick="exportChecked()">Export CSV</button>
+  <button class="action-btn outline" onclick="shareApplied()">Share Applied</button>
   <button class="action-btn" onclick="checkAllVisible()">Mark All Applied</button>
 </div>
 
@@ -705,6 +706,32 @@ function exportChecked() {
   a.download = `applied-jobs-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   showToast(`Exported ${checked.length} jobs as CSV`);
+}
+
+function shareApplied() {
+  const checks = [...checkedIds];
+  if (checks.length === 0) { showToast('No jobs checked yet'); return; }
+  // Build compact payload with timestamps
+  const payload = {
+    checks: checks.map(url => {
+      const j = JOBS.find(x => x.url === url);
+      return j ? { t: j.title.slice(0, 40), c: j.company, url } : { url };
+    }),
+    ts: new Date().toISOString(),
+    total: checks.length
+  };
+  const text = JSON.stringify(payload);
+  navigator.clipboard.writeText(text).then(() => {
+    showToast(`Copied ${checks.length} applied jobs to clipboard — paste to Peter!`);
+  }).catch(() => {
+    // Fallback: download as file
+    const blob = new Blob([text], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `va-checks-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    showToast(`Downloaded ${checks.length} applied jobs as JSON`);
+  });
 }
 
 function showToast(msg) {
