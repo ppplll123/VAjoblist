@@ -468,15 +468,60 @@ let currentSearch = '';
 let sortField = 'posted';
 let sortAsc = false;
 
-// ─── Persistence (localStorage + server-side applied_companies) ───
+// ─── Persistence (localStorage + JSONBin server-side) ───
+const JSONBIN_ID = '69c9d77336566621a85de249';
+const JSONBIN_KEY = '$2a$10$u1NdcqmI4Zuy1Zq4cyH5q.ZaMEXW11MAm0rUpeLaCiypZBCDrNdLK';
+let syncTimeout = null;
+
 function loadChecks() {
   try {
     const saved = localStorage.getItem('job-pipeline-checks');
     if (saved) checkedIds = new Set(JSON.parse(saved));
   } catch(e) {}
+  // Also load from server (merge, server wins for additions)
+  loadFromServer();
 }
-function saveChecks() {
+
+async function loadFromServer() {
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+      headers: { 'X-Access-Key': JSONBIN_KEY }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const serverUrls = data.record?.urls || [];
+    let changed = false;
+    serverUrls.forEach(url => {
+      if (!checkedIds.has(url)) { checkedIds.add(url); changed = true; }
+    });
+    if (changed) { saveLocal(); render(); }
+  } catch(e) { /* offline is fine, localStorage has backup */ }
+}
+
+function saveLocal() {
   localStorage.setItem('job-pipeline-checks', JSON.stringify([...checkedIds]));
+}
+
+function saveChecks() {
+  saveLocal();
+  // Debounce server sync (wait 2s after last click to batch)
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(syncToServer, 2000);
+}
+
+async function syncToServer() {
+  try {
+    const timestamps = {};
+    checkedIds.forEach(url => {
+      const j = JOBS.find(x => x.url === url);
+      if (j) timestamps[url] = new Date().toISOString();
+    });
+    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_KEY },
+      body: JSON.stringify({ urls: [...checkedIds], timestamps, last_updated: new Date().toISOString() })
+    });
+  } catch(e) { /* offline is fine */ }
 }
 
 // Auto-mark jobs from companies we applied to (baked into JS from Gmail sync)
