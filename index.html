@@ -499,7 +499,7 @@ body {
       <li><span class="feedback-label fb-wrong">Wrong Seniority</span> &mdash; if it's too junior (analyst, coordinator, specialist)</li>
       <li><span class="feedback-label fb-wrong">Wrong Company</span> &mdash; if the company is irrelevant</li>
       <li><span class="feedback-label fb-wrong">Other</span> &mdash; type your reason and press Enter (e.g., &quot;pharma - wrong industry&quot;)</li>
-      <li><span class="feedback-label fb-ideal">Ideal &#10003;</span> &mdash; if you think this is a PERFECT match for Peter. Use this for jobs at top companies (Revolut, Kraken, Binance, McKinsey) with the right seniority (Director, VP, Head of)</li>
+      <li><span style="background:#e8f5e9; border:1px solid #4caf50; color:#2e7d32; padding:1px 6px; border-radius:4px; font-size:11px; font-weight:600;">Ideal</span> &mdash; perfect match for Peter! Type WHY it's ideal and press Enter. Use for top companies (Revolut, Kraken, Binance, McKinsey) + right seniority (Director, VP, Head of)</li>
     </ul>
     <p style="margin:6px 0 10px; color:var(--text2); font-size:12px;">Your feedback directly improves the AI scoring model &mdash; the more you mark, the smarter it gets!</p>
     <h4>Tabs explained:</h4>
@@ -510,6 +510,17 @@ body {
     </ul>
     <h4>Filters:</h4>
     <p>Use <b>UAE</b>, <b>Warsaw</b>, <b>Remote</b>, <b>UAE-Prof</b> buttons to narrow down by region</p>
+    <h4 style="margin-top:12px;">Audio Instructions:</h4>
+    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+      <div style="background:#f8f8f8; border:1px solid #e0e0e0; border-radius:6px; padding:8px 12px;">
+        <div style="font-size:11px; color:#888; margin-bottom:4px;">English</div>
+        <audio controls preload="none" style="height:32px;"><source src="https://raw.githubusercontent.com/ppplll123/playwright/main/data/cherry_instructions_english.mp3" type="audio/mpeg">Your browser does not support audio.</audio>
+      </div>
+      <div style="background:#f8f8f8; border:1px solid #e0e0e0; border-radius:6px; padding:8px 12px;">
+        <div style="font-size:11px; color:#888; margin-bottom:4px;">Filipino / Tagalog</div>
+        <audio controls preload="none" style="height:32px;"><source src="https://raw.githubusercontent.com/ppplll123/playwright/main/data/cherry_instructions_filipino.mp3" type="audio/mpeg">Your browser does not support audio.</audio>
+      </div>
+    </div>
   </div>
   <div class="tabs">
     <button class="tab new-tab active" data-tab="new">
