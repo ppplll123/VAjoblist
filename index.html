@@ -423,7 +423,7 @@ body {
   </div>
   <div class="tabs">
     <button class="tab new-tab active" data-tab="new">
-      <span class="pulse-dot"></span> New <span class="count" id="tab-new-count">0</span>
+      <span class="pulse-dot"></span> New (24hrs) <span class="count" id="tab-new-count">0</span>
     </button>
     <button class="tab" data-tab="top">
       Top Jobs <span class="count" id="tab-top-count">0</span>
@@ -693,18 +693,20 @@ function getLatestBatch() {
   return dates[0] || null;
 }
 
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
 function isNewJob(j) {
-  return j.scraped_at === getLatestBatch();
+  if (!j.posted_iso) return false;
+  const postedMs = new Date(j.posted_iso).getTime();
+  return (Date.now() - postedMs) < TWENTY_FOUR_HOURS_MS;
 }
 
 // ─── Filtering ───
 function getFilteredJobs() {
-  const latestBatch = getLatestBatch();
-
   return JOBS.filter(j => {
     // Tab filter
     const isChecked = checkedIds.has(j.url);
-    const isNew = j.scraped_at === latestBatch && !isChecked;
+    const isNew = isNewJob(j) && !isChecked;
     const isEA = !!j.easy_apply;
     const isTop = j.score >= 0.9;
 
@@ -769,11 +771,10 @@ function render() {
   }
 
   const filtered = getFilteredJobs();
-  const latestBatch = getLatestBatch();
 
   if (filtered.length === 0) {
     const msgs = {
-      'new': 'No new jobs in the latest batch. Run the scraper!',
+      'new': 'No jobs posted in the last 24 hours. Check back after the next scrape!',
       'easy_apply': 'No Easy Apply jobs available (or all marked as applied).',
       'browse': 'No lower-score jobs to browse.',
       'applied': 'No jobs marked as applied yet.',
@@ -788,7 +789,7 @@ function render() {
 
     const renderJobRow = (j, showFb) => {
       const isChecked = checkedIds.has(j.url);
-      const isNew = j.scraped_at === latestBatch && !isChecked;
+      const isNew = isNewJob(j) && !isChecked;
       const rej = feedbackData[j.url];
       const scoreClass = j.score >= 0.97 ? 'score-hot' : j.score >= 0.93 ? 'score-warm' : 'score-cool';
       const regionClass = j.region.toLowerCase().replace('/', '');
@@ -869,7 +870,7 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => j.scraped_at === latestBatch && !checkedIds.has(j.url) && j.score >= 0.9 && !j.easy_apply);
+  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(j.url) && j.score >= 0.9 && !j.easy_apply);
   const topJobs = JOBS.filter(j => j.score >= 0.9 && !checkedIds.has(j.url) && !j.easy_apply);
   const eaJobs = JOBS.filter(j => j.easy_apply && !checkedIds.has(j.url));
   const applied = JOBS.filter(j => checkedIds.has(j.url));
