@@ -582,8 +582,8 @@ function render() {
       const meta = [j.company, j.salary, posted].filter(Boolean).join(' \u2022 ');
       const mobileScore = j.score >= 0.95 ? `<b class="${scoreClass}">${j.score.toFixed(2)}</b>` : '';
       const mobileTags = `<span class="mobile-tags"><span class="region-tag ${regionClass}">${j.region}</span>${mobileScore}${typeLabel}</span>`;
-      // Deep link to LinkedIn iOS app for Easy Apply jobs
-      const jobUrl = j.easy_apply ? j.url.replace('https://','linkedin://').replace('http://','linkedin://') : j.url;
+      // LinkedIn app uses Universal Links — normal https:// URLs auto-open in the app on iOS
+      const jobUrl = j.url;
 
       return `
         <div class="job-row ${isChecked ? 'checked' : ''} ${isNew ? 'is-new' : ''}">
@@ -612,7 +612,7 @@ function relativeDate(dateStr) {
   const diffMs = now - d;
   const diffH = Math.floor(diffMs / 3600000);
   const diffD = Math.floor(diffMs / 86400000);
-  if (diffD < 0) return 'future';
+  if (diffD < 0) return 'today';
   if (diffH < 1) return 'now';
   if (diffH < 24) return diffH + 'h ago';
   if (diffD === 1) return '1d ago';
