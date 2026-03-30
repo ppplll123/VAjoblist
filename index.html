@@ -434,14 +434,14 @@ body {
     <button class="tab" data-tab="applied">
       Applied <span class="count" id="tab-applied-count">0</span>
     </button>
-    <button class="tab ea-tab" data-tab="easy_apply">
-      Easy Apply <span class="count" id="tab-ea-count">0</span>
-    </button>
     <button class="tab" data-tab="all">
       All <span class="count" id="tab-all-count">0</span>
     </button>
     <button class="tab" data-tab="stats">
       Cherry
+    </button>
+    <button class="tab ea-tab" data-tab="easy_apply" style="box-shadow: inset 0 0 0 1px rgba(10,102,194,0.25), 0 1px 4px rgba(10,102,194,0.1); margin-left:8px;">
+      Easy Apply (Peter) <span class="count" id="tab-ea-count">0</span>
     </button>
   </div>
 </div>
@@ -716,11 +716,11 @@ function getFilteredJobs() {
     const isEA = !!j.easy_apply;
     const isTop = j.score >= 0.9;
 
-    if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;      // New top external jobs (for VA — EA excluded)
+    if (currentTab === 'new' && (!isNew || isEA)) return false;                 // Jobs posted in last 24hrs (external only)
     if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
-    if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;     // Unchecked Easy Apply (for Peter)
-    if (currentTab === 'applied' && !isChecked) return false;                  // All checked
-    if (currentTab === 'browse' && (isTop || isChecked)) return false;         // Lower score unchecked jobs
+    if (currentTab === 'easy_apply' && !isEA) return false;                    // All Easy Apply jobs (Peter) — checked shown crossed out at bottom
+    if (currentTab === 'applied' && (!isChecked || isEA)) return false;        // Cherry applied only (external, not EA)
+    if (currentTab === 'browse' && (isTop || isChecked || isEA)) return false; // Lower score unchecked external jobs
     // 'all' shows everything
 
     // Region / type filter
@@ -735,6 +735,12 @@ function getFilteredJobs() {
     }
     return true;
   }).sort((a, b) => {
+    // EA tab: unchecked first, checked (crossed out) at bottom
+    if (currentTab === 'easy_apply') {
+      const aChk = checkedIds.has(a.url) ? 1 : 0;
+      const bChk = checkedIds.has(b.url) ? 1 : 0;
+      if (aChk !== bChk) return aChk - bChk;
+    }
     let va = a[sortField], vb = b[sortField];
     if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
     if (typeof va === 'boolean') { va = va ? 1 : 0; vb = vb ? 1 : 0; }
@@ -763,6 +769,7 @@ function render() {
   // Show/hide Peter's EA progress card
   let eaCard = document.getElementById('ea-progress-card');
   if (currentTab === 'easy_apply') {
+    const eaTotalCount = JOBS.filter(j => j.easy_apply).length;
     const eaCheckedCount = JOBS.filter(j => j.easy_apply && checkedIds.has(j.url)).length;
     if (!eaCard) {
       eaCard = document.createElement('div');
@@ -770,7 +777,7 @@ function render() {
       eaCard.style.cssText = 'margin:16px 24px 8px; padding:12px 18px; background:#e8f4fd; border:1px solid #b3d9f2; border-radius:8px; display:flex; align-items:center; gap:10px; font-family:DM Mono,monospace; font-size:13px;';
       container.parentElement.insertBefore(eaCard, container);
     }
-    eaCard.innerHTML = `<span style="font-size:18px;">&#x1F4E8;</span> <b style="color:#0a66c2;">Peter's EA Progress:</b> <span style="font-size:18px; font-weight:700; color:#0a66c2;">${eaCheckedCount}</span> <span style="color:#666;">applied</span>`;
+    eaCard.innerHTML = `<span style="font-size:18px;">&#x1F4E8;</span> <b style="color:#0a66c2;">Peter:</b> <span style="font-size:18px; font-weight:700; color:#0a66c2;">${eaCheckedCount}</span> <span style="color:#666;">applied</span> <span style="color:#aaa; font-size:11px;">(${eaTotalCount - eaCheckedCount} remaining)</span>`;
     eaCard.style.display = 'flex';
   } else if (eaCard) {
     eaCard.style.display = 'none';
@@ -876,21 +883,22 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(j.url) && j.score >= 0.9 && !j.easy_apply);
+  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(j.url) && !j.easy_apply);
   const topJobs = JOBS.filter(j => j.score >= 0.9 && !checkedIds.has(j.url) && !j.easy_apply);
-  const eaJobs = JOBS.filter(j => j.easy_apply && !checkedIds.has(j.url));
-  const applied = JOBS.filter(j => checkedIds.has(j.url));
-  const browse = JOBS.filter(j => j.score < 0.9 && !checkedIds.has(j.url));
+  const allEA = JOBS.filter(j => j.easy_apply);
+  const eaUnchecked = allEA.filter(j => !checkedIds.has(j.url));
+  const cherryApplied = JOBS.filter(j => checkedIds.has(j.url) && !j.easy_apply);  // Applied = Cherry only
+  const browse = JOBS.filter(j => j.score < 0.9 && !checkedIds.has(j.url) && !j.easy_apply);
 
   document.getElementById('stat-new').textContent = newJobs.length;
-  document.getElementById('stat-ea').textContent = eaJobs.length;
-  document.getElementById('stat-applied').textContent = applied.length;
+  document.getElementById('stat-ea').textContent = allEA.length;
+  document.getElementById('stat-applied').textContent = cherryApplied.length;
   document.getElementById('stat-total').textContent = JOBS.length;
 
   document.getElementById('tab-new-count').textContent = newJobs.length;
   document.getElementById('tab-top-count').textContent = topJobs.length;
-  document.getElementById('tab-ea-count').textContent = eaJobs.length;
-  document.getElementById('tab-applied-count').textContent = applied.length;
+  document.getElementById('tab-ea-count').textContent = allEA.length;
+  document.getElementById('tab-applied-count').textContent = cherryApplied.length;
   document.getElementById('tab-browse-count').textContent = browse.length;
   document.getElementById('tab-all-count').textContent = JOBS.length;
 
