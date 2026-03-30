@@ -862,6 +862,7 @@ function saveFeedback() {
 }
 
 function submitFeedback(url, reason, detail) {
+  if (detail) detail = detail.substring(0, 200); // Cap to 200 chars — reasoning only, not full JDs
   const entry = { reason, timestamp: new Date().toISOString() };
   if ((reason === 'other' || reason === 'ideal' || reason === 'ea_reject' || reason === 'ea_applied') && detail) entry.detail = detail;
   feedbackData[url] = entry;
