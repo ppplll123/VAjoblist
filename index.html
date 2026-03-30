@@ -633,16 +633,23 @@ async function syncFeedbackToServer() {
   } catch(e) {}
 }
 
-function submitFeedback(url, reason) {
-  feedbackData[url] = { reason, timestamp: new Date().toISOString() };
+function submitFeedback(url, reason, detail) {
+  const entry = { reason, timestamp: new Date().toISOString() };
+  if (reason === 'other' && detail) entry.detail = detail;
+  feedbackData[url] = entry;
   saveFeedback();
   render();
-  const labels = { role: 'Wrong Role', seniority: 'Wrong Seniority', company: 'Wrong Company' };
-  showToast(`Marked as "${labels[reason]}"`);
+  const labels = { role: 'Wrong Role', seniority: 'Wrong Seniority', company: 'Wrong Company', other: 'Other' };
+  showToast(`Marked as "${labels[reason]}${detail ? ': ' + detail : ''}"`);
 }
 
 function isRejected(url) {
   return !!feedbackData[url];
+}
+
+function showOtherInput(btn, url) {
+  const input = btn.parentElement.querySelector('.fb-other-input');
+  if (input) { input.style.display = 'inline-block'; input.focus(); }
 }
 
 // Auto-mark jobs from companies we applied to (baked into JS from Gmail sync)
@@ -745,6 +752,22 @@ function render() {
   container.style.display = '';
   statsPanel.style.display = 'none';
 
+  // Show/hide Peter's EA progress card
+  let eaCard = document.getElementById('ea-progress-card');
+  if (currentTab === 'easy_apply') {
+    const eaCheckedCount = JOBS.filter(j => j.easy_apply && checkedIds.has(j.url)).length;
+    if (!eaCard) {
+      eaCard = document.createElement('div');
+      eaCard.id = 'ea-progress-card';
+      eaCard.style.cssText = 'margin:16px 24px 8px; padding:12px 18px; background:#e8f4fd; border:1px solid #b3d9f2; border-radius:8px; display:flex; align-items:center; gap:10px; font-family:DM Mono,monospace; font-size:13px;';
+      container.parentElement.insertBefore(eaCard, container);
+    }
+    eaCard.innerHTML = `<span style="font-size:18px;">&#x1F4E8;</span> <b style="color:#0a66c2;">Peter's EA Progress:</b> <span style="font-size:18px; font-weight:700; color:#0a66c2;">${eaCheckedCount}</span> <span style="color:#666;">applied</span>`;
+    eaCard.style.display = 'flex';
+  } else if (eaCard) {
+    eaCard.style.display = 'none';
+  }
+
   const filtered = getFilteredJobs();
   const latestBatch = getLatestBatch();
 
@@ -758,10 +781,10 @@ function render() {
     };
     container.innerHTML = `<div class="empty">${msgs[currentTab] || msgs.all}</div>`;
   } else {
-    // Separate rejected and non-rejected jobs
-    const showFeedbackBtns = ['new', 'top'].includes(currentTab);
-    const nonRejected = showFeedbackBtns ? filtered.filter(j => !isRejected(j.url)) : filtered;
-    const rejected = showFeedbackBtns ? filtered.filter(j => isRejected(j.url)) : [];
+    // Separate rejected and non-rejected jobs (feedback on ALL tabs)
+    const showFeedbackBtns = true;
+    const nonRejected = filtered.filter(j => !isRejected(j.url));
+    const rejected = filtered.filter(j => isRejected(j.url));
 
     const renderJobRow = (j, showFb) => {
       const isChecked = checkedIds.has(j.url);
@@ -771,7 +794,8 @@ function render() {
       const regionClass = j.region.toLowerCase().replace('/', '');
       const typeLabel = j.easy_apply ? '<span class="easy-apply-tag">Easy Apply</span>' : '<span class="ext-apply-tag">External</span>';
       const newBadge = isNew ? '<span class="new-badge">new</span>' : '';
-      const rejBadge = rej ? `<span class="rejected-reason">${rej.reason}</span>` : '';
+      const rejLabel = rej ? (rej.reason === 'other' && rej.detail ? `other: ${rej.detail}` : rej.reason) : '';
+      const rejBadge = rej ? `<span class="rejected-reason">${rejLabel}</span>` : '';
       const posted = j.posted || '';
       const relPosted = posted ? relativeDate(posted) : '';
       const meta = [j.company, j.salary, posted].filter(Boolean).join(' \u2022 ');
@@ -795,10 +819,12 @@ function render() {
           <div>${typeLabel}</div>
         </div>`;
       if (showFb && !rej && !isChecked) {
-        html += `<div class="feedback-row">
+        html += `<div class="feedback-row" id="fb-row-${escapedUrl.replace(/[^a-zA-Z0-9]/g,'_')}">
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','role')">Wrong Role</button>
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','seniority')">Wrong Seniority</button>
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','company')">Wrong Company</button>
+          <button class="fb-btn" onclick="showOtherInput(this,'${escapedUrl}')">Other</button>
+          <input class="fb-other-input" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid var(--border); border-radius:4px; width:140px; outline:none;" placeholder="Type reason + Enter" onkeydown="if(event.key==='Enter'){submitFeedback('${escapedUrl}','other',this.value);}" />
         </div>`;
       }
       return html;
@@ -961,8 +987,9 @@ async function renderStats() {
     } catch(e) {}
   }
 
-  const applied = JOBS.filter(j => checkedIds.has(j.url));
-  const appliedExt = applied.filter(j => !j.easy_apply);
+  const allApplied = JOBS.filter(j => checkedIds.has(j.url));
+  const cherryApplied = allApplied.filter(j => !j.easy_apply);  // Cherry = external only
+  const eaApplied = allApplied.filter(j => j.easy_apply);
 
   // Group by date (only count external/VA applications for Cherry)
   const byDate = {};
@@ -974,35 +1001,38 @@ async function renderStats() {
   });
   const sortedDays = Object.keys(byDate).sort().reverse();
   const today = new Date().toISOString().slice(0, 10);
-  const appliedToday = byDate[today] || 0;
+  const cherryToday = byDate[today] || 0;
   const dailyTarget = 40;
-  const progressPct = Math.min(100, Math.round((appliedToday / dailyTarget) * 100));
+  const progressPct = Math.min(100, Math.round((cherryToday / dailyTarget) * 100));
   const progressColor = progressPct >= 100 ? '#27ae60' : progressPct >= 50 ? '#d4880f' : '#c0392b';
 
   // Region breakdown
   const byRegion = {};
-  appliedExt.forEach(j => { byRegion[j.region] = (byRegion[j.region] || 0) + 1; });
+  cherryApplied.forEach(j => { byRegion[j.region] = (byRegion[j.region] || 0) + 1; });
 
   content.innerHTML = `
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#333;">${appliedExt.length}</div>
+      <div style="font-size:32px; font-weight:700; color:#333;">${allApplied.length}</div>
       <div style="font-size:13px; color:#888;">Total Applied</div>
+      <div style="font-size:10px; color:#aaa;">VA + Peter EA</div>
     </div>
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#c0392b;">${appliedExt.length}</div>
+      <div style="font-size:32px; font-weight:700; color:#c0392b;">${cherryApplied.length}</div>
       <div style="font-size:13px; color:#888;">Cherry Applied</div>
+      <div style="font-size:10px; color:#aaa;">External only</div>
     </div>
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:${progressColor};">${appliedToday} / ${dailyTarget}</div>
-      <div style="font-size:13px; color:#888;">Target: 40/day</div>
+      <div style="font-size:32px; font-weight:700; color:${progressColor};">${cherryToday} / ${dailyTarget}</div>
+      <div style="font-size:13px; color:#888;">Cherry Target: 40/day</div>
       <div style="margin-top:8px; background:#e0e0e0; border-radius:6px; height:10px; overflow:hidden;">
         <div style="width:${progressPct}%; height:100%; background:${progressColor}; border-radius:6px; transition:width 0.3s;"></div>
       </div>
       <div style="font-size:11px; color:#aaa; margin-top:4px;">${progressPct}% of daily goal (2hrs, 20/hr)</div>
     </div>
     <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#2980b9;">${appliedToday}</div>
+      <div style="font-size:32px; font-weight:700; color:#2980b9;">${cherryToday}</div>
       <div style="font-size:13px; color:#888;">Applied Today</div>
+      <div style="font-size:10px; color:#aaa;">Cherry external only</div>
     </div>
   `;
 
@@ -1019,16 +1049,28 @@ async function renderStats() {
     `<span style="display:inline-block; background:#f0f0f0; padding:4px 10px; border-radius:12px; margin:3px; font-size:12px;">${r}: ${c}</span>`
   ).join('');
 
-  // Recent applications (last 10)
+  // Recent applications (last 10) — fix country-code subdomains, make clickable, truncate
+  function fixJobUrl(url) {
+    return url.replace(/^(https?:\/\/)(uk|ae|ie|pt|ch|de|fr|in)\./i, '$1www.');
+  }
+  function extractJobTitle(url) {
+    // Try to get job title from /view/TITLE?... pattern
+    const viewMatch = url.match(/\/view\/([^?#]+)/);
+    if (viewMatch) return decodeURIComponent(viewMatch[1]).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).slice(0, 50);
+    // Fallback: last path segment
+    const parts = url.replace(/[?#].*/, '').split('/').filter(Boolean);
+    return parts[parts.length - 1]?.replace(/-/g, ' ')?.slice(0, 50) || url.slice(0, 50);
+  }
   const recentApplied = Object.entries(ts)
     .sort((a, b) => b[1].localeCompare(a[1]))
     .slice(0, 10)
     .map(([url, t]) => {
       const j = JOBS.find(x => x.url === url);
-      const name = j ? `${j.title.slice(0, 40)} — ${j.company}` : url.slice(0, 50);
+      const fixedUrl = fixJobUrl(url);
+      const name = j ? `${j.title.slice(0, 40)} — ${j.company}` : extractJobTitle(url);
       const ago = timeAgo(t);
       return `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f0f0f0;">
-        <span>${name}</span>
+        <a href="${fixedUrl}" target="_blank" style="color:var(--text); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${fixedUrl}">${name}</a>
         <span style="color:#888; font-size:12px; white-space:nowrap; margin-left:12px;">${ago}</span>
       </div>`;
     }).join('');
