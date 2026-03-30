@@ -474,6 +474,7 @@ body {
   <button class="filter-btn" data-filter="uk"><span class="dot" style="background:var(--uk)"></span>UK</button>
   <button class="filter-btn" data-filter="europe"><span class="dot" style="background:var(--europe)"></span>Europe</button>
   <button class="filter-btn" data-filter="remote"><span class="dot" style="background:var(--remote)"></span>Remote</button>
+  <button class="filter-btn" data-filter="prof" style="color:#673ab7;"><span class="dot" style="background:#673ab7"></span>UAE-Prof</button>
   <span style="color:var(--border)">|</span>
   <button class="filter-btn" data-filter="easy_apply">Easy Apply</button>
   <button class="filter-btn" data-filter="external">External</button>
@@ -742,7 +743,8 @@ function getFilteredJobs() {
     // Region / type filter
     if (currentFilter === 'easy_apply' && !j.easy_apply) return false;
     if (currentFilter === 'external' && j.easy_apply) return false;
-    if (!['all', 'easy_apply', 'external'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
+    if (currentFilter === 'prof' && !isProf) return false;
+    if (!['all', 'easy_apply', 'external', 'prof'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
 
     // Search
     if (currentSearch) {
