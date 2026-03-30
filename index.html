@@ -851,6 +851,7 @@ function render() {
           <div>
             <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}${idealBadge}${rejBadge}</a>
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
+            ${j.ai_reasoning ? `<div style="font-size:11px; color:#888; margin-top:2px; font-style:italic; line-height:1.3;">${esc(j.ai_reasoning)}</div>` : ''}
           </div>
           <div class="job-posted">${relPosted}</div>
           <div class="job-location">${esc(j.location)}</div>
