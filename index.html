@@ -733,18 +733,38 @@ async function syncFeedbackToServer() {
 
 function submitFeedback(url, reason, detail) {
   const entry = { reason, timestamp: new Date().toISOString() };
-  if (reason === 'other' && detail) entry.detail = detail;
+  if ((reason === 'other' || reason === 'ideal' || reason === 'ea_reject') && detail) entry.detail = detail;
   feedbackData[url] = entry;
   saveFeedback();
   render();
-  const labels = { ideal: 'Ideal ✅', role: 'Wrong Role', seniority: 'Wrong Seniority', company: 'Wrong Company', other: 'Other' };
+  const labels = { ideal: 'Ideal ✅', role: 'Wrong Role', seniority: 'Wrong Seniority', company: 'Wrong Company', other: 'Other', ea_reject: 'Rejected (Peter)' };
   showToast(`Marked as "${labels[reason] || reason}${detail ? ': ' + detail : ''}"`);
 }
 
 function isRejected(url) {
   const fb = feedbackData[url];
   if (!fb) return false;
-  return fb.reason !== 'ideal';  // "Ideal" is positive feedback, not a rejection
+  return fb.reason !== 'ideal';  // "Ideal" and no reason = positive feedback
+}
+
+function showEaRejectInput(btn, url) {
+  // Show inline input for Peter's EA rejection reason
+  let input = btn.parentElement.querySelector('.ea-reject-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.className = 'ea-reject-input';
+    input.style.cssText = 'font-family:DM Mono,monospace; font-size:10px; padding:2px 6px; border:1px solid #e57373; border-radius:4px; width:120px; outline:none; margin-top:2px;';
+    input.placeholder = 'Why? + Enter';
+    input.onkeydown = (e) => { if (e.key === 'Enter') { submitFeedback(url, 'ea_reject', input.value); } };
+    btn.parentElement.appendChild(input);
+  }
+  input.style.display = 'inline-block';
+  input.focus();
+}
+
+function showIdealInput(btn, url) {
+  const input = btn.parentElement.querySelector('.fb-ideal-input');
+  if (input) { input.style.display = 'inline-block'; input.focus(); }
 }
 
 function showOtherInput(btn, url) {
@@ -929,9 +949,16 @@ function render() {
       const escapedUrl = j.url.replace(/'/g, "\\'");
       const rowClass = `job-row ${isChecked ? 'checked' : ''} ${isNew ? 'is-new' : ''} ${rej ? 'rejected' : ''}`;
 
+      // EA tab: show A/R buttons instead of checkbox
+      const eaButtons = (currentTab === 'easy_apply' && !isChecked && !rej) ? `
+          <div style="display:flex; gap:4px; flex-direction:column; align-items:center;">
+            <button onclick="toggleCheck(event,'${escapedUrl}')" style="width:28px;height:22px;border:1px solid #4caf50;background:#e8f5e9;color:#2e7d32;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Applied">A</button>
+            <button onclick="showEaRejectInput(this,'${escapedUrl}')" style="width:28px;height:22px;border:1px solid #e57373;background:#fce4e4;color:#c62828;border-radius:4px;font-weight:700;font-size:12px;cursor:pointer;" title="Rejected (type reason)">R</button>
+          </div>` : `<div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${escapedUrl}')"></div>`;
+
       let html = `
         <div class="${rowClass}">
-          <div class="check ${isChecked ? 'on' : ''}" onclick="toggleCheck(event, '${escapedUrl}')"></div>
+          ${eaButtons}
           <div>
             <a class="job-title-link" href="${jobUrl}" target="_blank">${esc(j.title)}${newBadge}${idealBadge}${rejBadge}</a>
             <div class="job-meta">${esc(meta)}${mobileTags}</div>
@@ -949,8 +976,9 @@ function render() {
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','seniority')">Wrong Seniority</button>
           <button class="fb-btn" onclick="submitFeedback('${escapedUrl}','company')">Wrong Company</button>
           <button class="fb-btn" onclick="showOtherInput(this,'${escapedUrl}')">Other</button>
-          <button class="fb-btn fb-ideal" onclick="submitFeedback('${escapedUrl}','ideal')" style="background:#e8f5e9; border-color:#4caf50; color:#2e7d32;">Ideal</button>
-          <input class="fb-other-input" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid var(--border); border-radius:4px; width:140px; outline:none;" placeholder="Type reason + Enter" onkeydown="if(event.key==='Enter'){submitFeedback('${escapedUrl}','other',this.value);}" />
+          <input class="fb-other-input" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid var(--border); border-radius:4px; width:140px; outline:none;" placeholder="Why wrong? + Enter" onkeydown="if(event.key==='Enter'){submitFeedback('${escapedUrl}','other',this.value);}" />
+          <button class="fb-btn fb-ideal" onclick="showIdealInput(this,'${escapedUrl}')" style="background:#e8f5e9; border-color:#4caf50; color:#2e7d32;">Ideal</button>
+          <input class="fb-ideal-input" style="display:none; font-family:'DM Mono',monospace; font-size:10px; padding:2px 6px; border:1px solid #4caf50; border-radius:4px; width:140px; outline:none; background:#f1f8e9;" placeholder="Why ideal? + Enter" onkeydown="if(event.key==='Enter'){submitFeedback('${escapedUrl}','ideal',this.value);}" />
         </div>`;
       }
       return html;
