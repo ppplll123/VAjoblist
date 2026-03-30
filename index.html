@@ -530,7 +530,6 @@ body {
     <p style="font-size:12px; line-height:1.6;">
       <span style="background:#e3f2fd;color:#2164f3;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">INMCP</span> Indeed via MCP API &nbsp;
       <span style="background:#fff3e0;color:#ff6f00;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">INJS</span> Indeed via JobSpy (auto-cron) &nbsp;
-      <span style="background:#f3e5f5;color:#9c27b0;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">INPY</span> Indeed via Playwright &nbsp;
       <span style="background:#e3f2fd;color:#0a66c2;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">LI</span> LinkedIn
     </p>
     <h4 style="margin-top:12px;">Audio Instructions:</h4>
@@ -595,7 +594,6 @@ body {
   <button class="filter-btn" data-filter="linkedin" style="color:#0a66c2;">LI</button>
   <button class="filter-btn" data-filter="indeed_mcp" style="color:#2164f3;">INMCP</button>
   <button class="filter-btn" data-filter="jobspy" style="color:#ff6f00;">INJS</button>
-  <button class="filter-btn" data-filter="indeed_pw" style="color:#9c27b0;">INPY</button>
   <input class="search-box" placeholder="Search title, company..." id="search" />
   <select class="mobile-sort" id="mobile-sort" onchange="mobileSortChange(this.value)">
     <option value="score-desc">Score (high)</option>
@@ -942,8 +940,7 @@ function getFilteredJobs() {
     if (currentFilter === 'linkedin' && j.source !== 'linkedin' && j.source !== undefined) return false;
     if (currentFilter === 'indeed_mcp' && j.source !== 'indeed') return false;
     if (currentFilter === 'jobspy' && j.source !== 'jobspy') return false;
-    if (currentFilter === 'indeed_pw' && j.source !== 'indeed_pw') return false;
-    if (!['all', 'easy_apply', 'external', 'prof', 'linkedin', 'indeed_mcp', 'jobspy', 'indeed_pw'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
+    if (!['all', 'easy_apply', 'external', 'prof', 'linkedin', 'indeed_mcp', 'jobspy'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
 
     // Search
     if (currentSearch) {
@@ -1045,7 +1042,6 @@ function render() {
       const srcBadges = {
         'indeed': '<span class="source-badge" style="background:#e3f2fd;color:#2164f3;">INMCP</span>',
         'jobspy': '<span class="source-badge" style="background:#fff3e0;color:#ff6f00;">INJS</span>',
-        'indeed_pw': '<span class="source-badge" style="background:#f3e5f5;color:#9c27b0;">INPY</span>',
       };
       const srcBadge = srcBadges[j.source] || '<span class="source-badge source-li">LI</span>';
       const typeLabel = j.easy_apply ? `${srcBadge}<span class="easy-apply-tag">Easy Apply</span>` : `${srcBadge}<span class="ext-apply-tag">External</span>`;
