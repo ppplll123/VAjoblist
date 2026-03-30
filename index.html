@@ -92,6 +92,9 @@ body {
 .tab.new-tab.active .count { background: var(--new-green); }
 .tab.ea-tab .count { background: #0a66c2; color: #fff; }
 .tab.ea-tab.active .count { background: #0a66c2; }
+.tab.cherry-tab .count { background: #c0392b; color: #fff; }
+.tab.cherry-tab.active { color: #c0392b; border-color: #c0392b; }
+.tab.cherry-tab.active .count { background: #c0392b; }
 
 /* Pulse dot for new tab */
 .pulse-dot {
@@ -437,8 +440,8 @@ body {
     <button class="tab" data-tab="all">
       All <span class="count" id="tab-all-count">0</span>
     </button>
-    <button class="tab" data-tab="stats">
-      Cherry
+    <button class="tab cherry-tab" data-tab="stats">
+      Cherry <span class="count cherry-count" id="tab-cherry-count">0/40</span>
     </button>
     <button class="tab ea-tab" data-tab="easy_apply" style="box-shadow: inset 0 0 0 1px rgba(10,102,194,0.25), 0 1px 4px rgba(10,102,194,0.1); margin-left:8px;">
       Easy Apply (Peter) <span class="count" id="tab-ea-count">0</span>
@@ -447,11 +450,11 @@ body {
 </div>
 
 <!-- Cherry panel (hidden by default, shown when Cherry tab active) -->
-<div id="stats-panel" style="display:none; padding: 20px;">
-  <h3 style="margin:0 0 16px; font-size:18px;">Cherry's Performance</h3>
+<div id="stats-panel" style="display:none; padding: 20px; background: linear-gradient(180deg, #fdf2f2 0%, #fafaf8 100%); border-top: 3px solid #c0392b;">
+  <h3 style="margin:0 0 16px; font-size:18px; color:#c0392b;">Cherry's Performance</h3>
   <div id="stats-content" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
   </div>
-  <h3 style="margin:24px 0 12px; font-size:16px;">Recent Applications</h3>
+  <h3 style="margin:24px 0 12px; font-size:16px; color:#c0392b;">Recent Applications</h3>
   <div id="stats-recent" style="font-size:13px;"></div>
 </div>
 
@@ -755,6 +758,16 @@ function render() {
   const container = document.getElementById('jobs');
   const statsPanel = document.getElementById('stats-panel');
 
+  // Update page title based on tab
+  const logo = document.querySelector('.logo');
+  if (currentTab === 'stats') {
+    logo.innerHTML = 'Job Pipeline <i style="color:#c0392b">Cherry Dashboard</i>';
+    document.title = 'Cherry Dashboard — VA Review';
+  } else {
+    logo.innerHTML = 'Job Pipeline <i>VA Review</i>';
+    document.title = 'Job Pipeline — VA Review Dashboard';
+  }
+
   // Stats tab: show stats panel, hide jobs
   if (currentTab === 'stats') {
     container.style.display = 'none';
@@ -901,6 +914,7 @@ function updateStats() {
   document.getElementById('tab-applied-count').textContent = cherryApplied.length;
   document.getElementById('tab-browse-count').textContent = browse.length;
   document.getElementById('tab-all-count').textContent = JOBS.length;
+  document.getElementById('tab-cherry-count').textContent = `${cherryApplied.length}/40`;
 
   // Batch info
   if (latestBatch) {
@@ -1026,20 +1040,20 @@ async function renderStats() {
   cherryApplied.forEach(j => { byRegion[j.region] = (byRegion[j.region] || 0) + 1; });
 
   content.innerHTML = `
-    <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
+    <div style="background:#fff5f5; border:1px solid #f0d0d0; padding:16px; border-radius:8px; text-align:center;">
       <div style="font-size:32px; font-weight:700; color:#c0392b;">${cherryApplied.length}</div>
       <div style="font-size:13px; color:#888;">Cherry Applied</div>
       <div style="font-size:10px; color:#aaa;">External only (all time)</div>
     </div>
-    <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
+    <div style="background:#fff5f5; border:1px solid #f0d0d0; padding:16px; border-radius:8px; text-align:center;">
       <div style="font-size:32px; font-weight:700; color:${progressColor};">${cherryToday} / ${dailyTarget}</div>
       <div style="font-size:13px; color:#888;">Cherry Target: 40/day</div>
-      <div style="margin-top:8px; background:#e0e0e0; border-radius:6px; height:10px; overflow:hidden;">
+      <div style="margin-top:8px; background:#f0d0d0; border-radius:6px; height:10px; overflow:hidden;">
         <div style="width:${progressPct}%; height:100%; background:${progressColor}; border-radius:6px; transition:width 0.3s;"></div>
       </div>
       <div style="font-size:11px; color:#aaa; margin-top:4px;">${progressPct}% of daily goal (2hrs, 20/hr)</div>
     </div>
-    <div style="background:#f8f8f8; padding:16px; border-radius:8px; text-align:center;">
+    <div style="background:#fff5f5; border:1px solid #f0d0d0; padding:16px; border-radius:8px; text-align:center;">
       <div style="font-size:32px; font-weight:700; color:#2980b9;">${cherryToday}</div>
       <div style="font-size:13px; color:#888;">Cherry Today</div>
       <div style="font-size:10px; color:#aaa;">External only</div>
