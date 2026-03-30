@@ -801,8 +801,11 @@ async function syncToServer() {
       const n = normUrl(url);
       if (!serverTimestamps[n]) serverTimestamps[n] = now;
     });
-    // Remove unchecked URLs from timestamps (normalize for comparison)
+    // Remove unchecked URLs from timestamps — but keep emailNum entries (they persist independently)
     Object.keys(serverTimestamps).forEach(url => {
+      const val = serverTimestamps[url];
+      // Keep entries that have emailNum (assigned for Cherry's copy, not tied to checkbox)
+      if (typeof val === 'object' && val !== null && val.emailNum) return;
       const hasRaw = checkedIds.has(url);
       const hasNorm = checkedIds.has(normUrl(url));
       if (!hasRaw && !hasNorm) delete serverTimestamps[url];
