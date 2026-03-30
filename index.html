@@ -576,6 +576,9 @@ body {
   <span style="color:var(--border)">|</span>
   <button class="filter-btn" data-filter="easy_apply">Easy Apply</button>
   <button class="filter-btn" data-filter="external">External</button>
+  <span style="color:var(--border)">|</span>
+  <button class="filter-btn" data-filter="linkedin" style="color:#0a66c2;">LI</button>
+  <button class="filter-btn" data-filter="indeed" style="color:#2164f3;">IN</button>
   <input class="search-box" placeholder="Search title, company..." id="search" />
   <select class="mobile-sort" id="mobile-sort" onchange="mobileSortChange(this.value)">
     <option value="score-desc">Score (high)</option>
@@ -616,6 +619,45 @@ let currentFilter = 'all';
 let currentSearch = '';
 let sortField = 'posted';
 let sortAsc = false;
+
+// ─── URL hash routing (shareable links) ───
+function updateHash() {
+  const parts = [];
+  if (currentTab !== 'new') parts.push('tab=' + currentTab);
+  if (currentFilter !== 'all') parts.push('filter=' + currentFilter);
+  if (currentSearch) parts.push('q=' + encodeURIComponent(currentSearch));
+  window.history.replaceState(null, '', parts.length ? '#' + parts.join('&') : window.location.pathname);
+}
+
+function loadFromHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return;
+  const params = Object.fromEntries(hash.split('&').map(p => p.split('=')));
+  if (params.tab) {
+    currentTab = params.tab;
+    document.querySelectorAll('.tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === currentTab);
+    });
+    if (currentTab === 'new' || currentTab === 'top') {
+      sortField = 'posted'; sortAsc = false;
+    } else {
+      sortField = 'score'; sortAsc = false;
+    }
+  }
+  if (params.filter) {
+    currentFilter = params.filter;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.filter === currentFilter);
+    });
+  }
+  if (params.q) {
+    currentSearch = decodeURIComponent(params.q);
+    const searchEl = document.getElementById('search');
+    if (searchEl) searchEl.value = currentSearch;
+  }
+}
+
+window.addEventListener('hashchange', () => { loadFromHash(); render(); });
 
 // ─── Persistence (localStorage + JSONBin server-side) ───
 const JSONBIN_ID = '69c9d77336566621a85de249';
@@ -862,7 +904,9 @@ function getFilteredJobs() {
     if (currentFilter === 'easy_apply' && !j.easy_apply) return false;
     if (currentFilter === 'external' && j.easy_apply) return false;
     if (currentFilter === 'prof' && !isProf) return false;
-    if (!['all', 'easy_apply', 'external', 'prof'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
+    if (currentFilter === 'linkedin' && j.source !== 'linkedin' && j.source !== undefined) return false;
+    if (currentFilter === 'indeed' && j.source !== 'indeed') return false;
+    if (!['all', 'easy_apply', 'external', 'prof', 'linkedin', 'indeed'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
 
     // Search
     if (currentSearch) {
@@ -1283,9 +1327,10 @@ document.querySelectorAll('.tab').forEach(btn => {
     // Default sort: New/Top by posted date (newest first), others by score
     if (currentTab === 'new' || currentTab === 'top') {
       sortField = 'posted'; sortAsc = false;
-    } else if (currentTab === 'easy_apply' || currentTab === 'browse') {
+    } else {
       sortField = 'score'; sortAsc = false;
     }
+    updateHash();
     render();
   });
 });
@@ -1296,6 +1341,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
+    updateHash();
     render();
   });
 });
@@ -1303,6 +1349,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 // Search
 document.getElementById('search').addEventListener('input', e => {
   currentSearch = e.target.value;
+  updateHash();
   render();
 });
 
@@ -1316,6 +1363,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ─── Init ───
+loadFromHash();
 loadChecks();
 loadFeedbackLocal();
 </script>
