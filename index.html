@@ -626,7 +626,7 @@ body {
   <button class="action-btn" onclick="checkAllVisible()">Mark All Applied</button>
 </div>
 
-<div class="job-list">
+<div class="job-list" id="job-list-wrapper">
   <div class="col-header">
     <span onclick="toggleAllVisible()" title="Mark all as applied">VA</span>
     <span onclick="sortBy('title')">Title / Company</span>
@@ -1052,17 +1052,18 @@ function render() {
     document.title = 'Job Pipeline — VA Review Dashboard';
   }
 
-  // Stats tab: show stats panel, hide jobs + filters
+  // Stats tab: show stats panel, hide jobs + filters + column headers
   const controlsRow = document.getElementById('controls-row');
+  const jobListWrapper = document.getElementById('job-list-wrapper');
   if (currentTab === 'stats') {
-    container.style.display = 'none';
+    if (jobListWrapper) jobListWrapper.style.display = 'none';
     if (controlsRow) controlsRow.style.display = 'none';
     statsPanel.style.display = 'block';
     renderStats();
     updateStats([]);
     return;
   }
-  container.style.display = '';
+  if (jobListWrapper) jobListWrapper.style.display = '';
   if (controlsRow) controlsRow.style.display = '';
   statsPanel.style.display = 'none';
 
