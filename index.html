@@ -593,7 +593,7 @@ body {
   <div id="stats-recent" style="font-size:13px;"></div>
 </div>
 
-<div class="controls-row">
+<div class="controls-row" id="controls-row">
   <button class="filter-btn active" data-filter="all">All</button>
   <button class="filter-btn" data-filter="uae"><span class="dot" style="background:var(--uae)"></span>UAE</button>
   <button class="filter-btn" data-filter="poland"><span class="dot" style="background:var(--poland)"></span>Warsaw</button>
@@ -1052,15 +1052,18 @@ function render() {
     document.title = 'Job Pipeline — VA Review Dashboard';
   }
 
-  // Stats tab: show stats panel, hide jobs
+  // Stats tab: show stats panel, hide jobs + filters
+  const controlsRow = document.getElementById('controls-row');
   if (currentTab === 'stats') {
     container.style.display = 'none';
+    if (controlsRow) controlsRow.style.display = 'none';
     statsPanel.style.display = 'block';
     renderStats();
     updateStats([]);
     return;
   }
   container.style.display = '';
+  if (controlsRow) controlsRow.style.display = '';
   statsPanel.style.display = 'none';
 
   // Show/hide Peter's EA progress card
@@ -1416,23 +1419,14 @@ async function renderStats() {
   cherryApplied.forEach(j => { byRegion[j.region] = (byRegion[j.region] || 0) + 1; });
 
   content.innerHTML = `
-    <div style="background:#fff5f5; border:1px solid #f0d0d0; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#c0392b;">${cherryApplied.length}</div>
-      <div style="font-size:13px; color:#888;">Cherry Applied</div>
-      <div style="font-size:10px; color:#aaa;">External only (all time)</div>
-    </div>
-    <div style="background:#fff5f5; border:1px solid #f0d0d0; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:${progressColor};">${cherryToday} / ${dailyTarget}</div>
-      <div style="font-size:13px; color:#888;">Cherry Target: 40/day</div>
-      <div style="margin-top:8px; background:#f0d0d0; border-radius:6px; height:10px; overflow:hidden;">
+    <div style="background:#fff5f5; border:1px solid #f0d0d0; padding:24px; border-radius:12px; text-align:center; grid-column: 1 / -1;">
+      <div style="font-size:48px; font-weight:700; color:${progressColor};">${cherryToday} / ${dailyTarget}</div>
+      <div style="font-size:15px; color:#888; margin-top:4px;">Today's Target</div>
+      <div style="margin-top:12px; background:#f0d0d0; border-radius:6px; height:14px; overflow:hidden; max-width:400px; margin-left:auto; margin-right:auto;">
         <div style="width:${progressPct}%; height:100%; background:${progressColor}; border-radius:6px; transition:width 0.3s;"></div>
       </div>
-      <div style="font-size:11px; color:#aaa; margin-top:4px;">${progressPct}% of daily goal (2hrs, 20/hr)</div>
-    </div>
-    <div style="background:#fff5f5; border:1px solid #f0d0d0; padding:16px; border-radius:8px; text-align:center;">
-      <div style="font-size:32px; font-weight:700; color:#2980b9;">${cherryToday}</div>
-      <div style="font-size:13px; color:#888;">Cherry Today</div>
-      <div style="font-size:10px; color:#aaa;">External only</div>
+      <div style="font-size:12px; color:#aaa; margin-top:6px;">${progressPct}% — ${cherryToday === 0 ? 'No applications yet today' : cherryToday >= dailyTarget ? 'Target reached!' : `${dailyTarget - cherryToday} more to go`}</div>
+      <div style="font-size:11px; color:#bbb; margin-top:8px;">All time: ${cherryApplied.length} external applications</div>
     </div>
   `;
 
