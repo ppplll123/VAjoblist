@@ -1389,6 +1389,8 @@ async function renderStats() {
   Object.entries(ts).forEach(([url, t]) => {
     const j = JOBS.find(x => x.url === url);
     if (!j || j.easy_apply) return; // skip Easy Apply (Peter's) and unknown URLs
+    // t can be a string (timestamp) or object ({emailNum: "002"}) — only use strings
+    if (typeof t !== 'string') return;
     const day = t.slice(0, 10);
     byDate[day] = (byDate[day] || 0) + 1;
   });
@@ -1460,7 +1462,7 @@ async function renderStats() {
     return parts[parts.length - 1]?.replace(/-/g, ' ')?.slice(0, 50) || url.slice(0, 50);
   }
   const recentApplied = Object.entries(ts)
-    .filter(([url]) => { const j = JOBS.find(x => x.url === normUrl(url)); return !j || !j.easy_apply; })
+    .filter(([url, t]) => { if (typeof t !== 'string') return false; const j = JOBS.find(x => x.url === normUrl(url)); return !j || !j.easy_apply; })
     .sort((a, b) => b[1].localeCompare(a[1]))
     .slice(0, 10)
     .map(([url, t]) => {
