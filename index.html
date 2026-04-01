@@ -723,7 +723,7 @@ function validateSyncPayload(payload) {
 function loadChecks() {
   try {
     const saved = localStorage.getItem('job-pipeline-checks');
-    if (saved) checkedIds = new Set(JSON.parse(saved));
+    if (saved) checkedIds = new Set(JSON.parse(saved).map(normUrl));
   } catch(e) {}
   // Also load from server (merge, server wins for additions)
   loadFromServer();
@@ -734,14 +734,31 @@ function normUrl(url) {
   return url.replace(/https?:\/\/[a-z]{2}\.linkedin\.com\//, 'https://www.linkedin.com/');
 }
 
+// Single cached JSONBin fetch — prevents duplicate network requests on load
+let _jsonBinCache = null;
+let _jsonBinCachePromise = null;
+async function fetchJsonBin() {
+  if (_jsonBinCache) return _jsonBinCache;
+  if (_jsonBinCachePromise) return _jsonBinCachePromise;
+  _jsonBinCachePromise = (async () => {
+    try {
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+        headers: { 'X-Access-Key': JSONBIN_KEY }
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      _jsonBinCache = data.record || {};
+      return _jsonBinCache;
+    } catch(e) { return null; }
+    finally { _jsonBinCachePromise = null; }
+  })();
+  return _jsonBinCachePromise;
+}
+
 async function loadFromServer() {
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-      headers: { 'X-Access-Key': JSONBIN_KEY }
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    const record = data.record || {};
+    const record = await fetchJsonBin();
+    if (!record) return;
     // JSONBin is source of truth — replace localStorage with server state
     const serverUrls = record.urls || [];
     serverTimestamps = record.timestamps || {};
@@ -754,10 +771,11 @@ async function loadFromServer() {
       }
     });
     emailCounter = maxEmail;
-    // Merge: server URLs + local URLs (union — never lose a checkmark)
+    // Merge: server URLs + local URLs (union — never lose a checkmark), normalize all
     let changed = false;
     serverUrls.forEach(url => {
-      if (!checkedIds.has(url)) { checkedIds.add(url); changed = true; }
+      const n = normUrl(url);
+      if (!checkedIds.has(n)) { checkedIds.add(n); changed = true; }
     });
     // Also load feedback from server (merge with local)
     const serverFeedback = record.feedback || {};
@@ -786,13 +804,8 @@ async function syncToServer() {
     // First read existing timestamps so we don't overwrite them
     if (Object.keys(serverTimestamps).length === 0) {
       try {
-        const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-          headers: { 'X-Access-Key': JSONBIN_KEY }
-        });
-        if (r.ok) {
-          const d = await r.json();
-          serverTimestamps = d.record?.timestamps || {};
-        }
+        const record = await fetchJsonBin();
+        if (record) serverTimestamps = record.timestamps || {};
       } catch(e) {}
     }
     // Only set timestamp for NEW clicks (not already tracked), normalize URLs
@@ -806,11 +819,9 @@ async function syncToServer() {
       const val = serverTimestamps[url];
       // Keep entries that have emailNum (assigned for Cherry's copy, not tied to checkbox)
       if (typeof val === 'object' && val !== null && val.emailNum) return;
-      const hasRaw = checkedIds.has(url);
-      const hasNorm = checkedIds.has(normUrl(url));
-      if (!hasRaw && !hasNorm) delete serverTimestamps[url];
+      if (!checkedIds.has(normUrl(url))) delete serverTimestamps[url];
     });
-    const payload = { urls: [...checkedIds], timestamps: serverTimestamps, feedback: feedbackData, last_updated: now };
+    const payload = { urls: [...checkedIds].map(normUrl), timestamps: serverTimestamps, feedback: feedbackData, last_updated: now };
     if (!validateSyncPayload(payload)) {
       console.warn('JSONBin sync aborted: payload failed validation');
       return;
@@ -820,6 +831,7 @@ async function syncToServer() {
       headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_KEY },
       body: JSON.stringify(payload)
     });
+    _jsonBinCache = null; // invalidate cache after write
   } catch(e) { /* offline is fine */ }
 }
 
@@ -834,12 +846,9 @@ function loadFeedbackLocal() {
 
 async function loadFeedbackFromServer() {
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-      headers: { 'X-Access-Key': JSONBIN_KEY }
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    const serverFb = data.record?.feedback || {};
+    const record = await fetchJsonBin();
+    if (!record) return;
+    const serverFb = record.feedback || {};
     let changed = false;
     Object.entries(serverFb).forEach(([url, info]) => {
       if (!feedbackData[url]) { feedbackData[url] = info; changed = true; }
@@ -891,7 +900,7 @@ function eaApply(btn, url) {
       if (ev.key === 'Enter') {
         submitFeedback(url, 'ea_applied', input.value);
         // Also mark as checked (applied)
-        checkedIds.add(url);
+        checkedIds.add(normUrl(url));
         saveChecks();
         render();
       }
@@ -932,8 +941,8 @@ function prefillEasyApply() {
   // Auto-mark jobs with applied:true flag (baked in from Gmail sync during build)
   let count = 0;
   JOBS.forEach(j => {
-    if (j.applied && !checkedIds.has(j.url)) {
-      checkedIds.add(j.url);
+    if (j.applied && !checkedIds.has(normUrl(j.url))) {
+      checkedIds.add(normUrl(j.url));
       count++;
     }
   });
@@ -945,8 +954,8 @@ function migrateEasyApplyChecks() {
   if (localStorage.getItem('job-pipeline-ea-migrated')) return;
   let changed = false;
   JOBS.forEach(j => {
-    if (j.easy_apply && checkedIds.has(j.url)) {
-      checkedIds.delete(j.url);
+    if (j.easy_apply && checkedIds.has(normUrl(j.url))) {
+      checkedIds.delete(normUrl(j.url));
       changed = true;
     }
   });
@@ -980,7 +989,7 @@ function isNewJob(j) {
 function getFilteredJobs() {
   return JOBS.filter(j => {
     // Tab filter
-    const isChecked = checkedIds.has(j.url);
+    const isChecked = checkedIds.has(normUrl(j.url));
     const isNew = isNewJob(j) && !isChecked;
     const isEA = !!j.easy_apply;
     const isTop = j.score >= 0.9;
@@ -1017,8 +1026,8 @@ function getFilteredJobs() {
   }).sort((a, b) => {
     // EA tab: unchecked first, checked (crossed out) at bottom
     if (currentTab === 'easy_apply') {
-      const aChk = checkedIds.has(a.url) ? 1 : 0;
-      const bChk = checkedIds.has(b.url) ? 1 : 0;
+      const aChk = checkedIds.has(normUrl(a.url)) ? 1 : 0;
+      const bChk = checkedIds.has(normUrl(b.url)) ? 1 : 0;
       if (aChk !== bChk) return aChk - bChk;
     }
     let va = a[sortField], vb = b[sortField];
@@ -1071,7 +1080,7 @@ function render() {
   let eaCard = document.getElementById('ea-progress-card');
   if (currentTab === 'easy_apply') {
     const eaTotalCount = JOBS.filter(j => j.easy_apply).length;
-    const eaCheckedCount = JOBS.filter(j => j.easy_apply && checkedIds.has(j.url)).length;
+    const eaCheckedCount = JOBS.filter(j => j.easy_apply && checkedIds.has(normUrl(j.url))).length;
     if (!eaCard) {
       eaCard = document.createElement('div');
       eaCard.id = 'ea-progress-card';
@@ -1102,7 +1111,7 @@ function render() {
     const rejected = filtered.filter(j => isRejected(j.url));
 
     const renderJobRow = (j, showFb) => {
-      const isChecked = checkedIds.has(j.url);
+      const isChecked = checkedIds.has(normUrl(j.url));
       const isNew = isNewJob(j) && !isChecked;
       const fb = feedbackData[j.url];
       const rej = fb && fb.reason !== 'ideal' ? fb : null;  // "ideal" is positive, not rejection
@@ -1240,12 +1249,12 @@ function relativeDate(dateStr) {
 // ─── Actions ───
 function toggleCheck(e, url) {
   e.stopPropagation();
-  if (checkedIds.has(url)) {
-    checkedIds.delete(url);
+  const nUrl = normUrl(url);
+  if (checkedIds.has(nUrl)) {
+    checkedIds.delete(nUrl);
   } else {
-    checkedIds.add(url);
+    checkedIds.add(nUrl);
     // Assign email number when checking (applying)
-    const nUrl = normUrl(url);
     if (!serverTimestamps[nUrl] || !serverTimestamps[nUrl].emailNum) {
       const num = getNextEmailNumber();
       if (!serverTimestamps[nUrl]) serverTimestamps[nUrl] = Date.now();
@@ -1262,12 +1271,12 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(j.url) && j.score >= 0.9 && !j.easy_apply);
-  const topJobs = JOBS.filter(j => j.score >= 0.9 && !checkedIds.has(j.url) && !j.easy_apply);
+  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(normUrl(j.url)) && j.score >= 0.9 && !j.easy_apply);
+  const topJobs = JOBS.filter(j => j.score >= 0.9 && !checkedIds.has(normUrl(j.url)) && !j.easy_apply);
   const allEA = JOBS.filter(j => j.easy_apply);
-  const eaUnchecked = allEA.filter(j => !checkedIds.has(j.url));
-  const cherryApplied = JOBS.filter(j => checkedIds.has(j.url) && !j.easy_apply);  // Applied = Cherry only
-  const browse = JOBS.filter(j => j.score < 0.9 && !checkedIds.has(j.url) && !j.easy_apply);
+  const eaUnchecked = allEA.filter(j => !checkedIds.has(normUrl(j.url)));
+  const cherryApplied = JOBS.filter(j => checkedIds.has(normUrl(j.url)) && !j.easy_apply);  // Applied = Cherry only
+  const browse = JOBS.filter(j => j.score < 0.9 && !checkedIds.has(normUrl(j.url)) && !j.easy_apply);
 
   document.getElementById('stat-new').textContent = newJobs.length;
   document.getElementById('stat-ea').textContent = allEA.length;
@@ -1302,10 +1311,10 @@ function sortBy(field) {
 
 function toggleAllVisible() {
   const filtered = getFilteredJobs();
-  const allChecked = filtered.every(j => checkedIds.has(j.url));
+  const allChecked = filtered.every(j => checkedIds.has(normUrl(j.url)));
   filtered.forEach(j => {
-    if (allChecked) checkedIds.delete(j.url);
-    else checkedIds.add(j.url);
+    if (allChecked) checkedIds.delete(normUrl(j.url));
+    else checkedIds.add(normUrl(j.url));
   });
   saveChecks();
   render();
@@ -1313,14 +1322,14 @@ function toggleAllVisible() {
 
 function checkAllVisible() {
   const filtered = getFilteredJobs();
-  filtered.forEach(j => checkedIds.add(j.url));
+  filtered.forEach(j => checkedIds.add(normUrl(j.url)));
   saveChecks();
   render();
   showToast(`Marked ${filtered.length} jobs as applied`);
 }
 
 function exportChecked() {
-  const checked = JOBS.filter(j => checkedIds.has(j.url));
+  const checked = JOBS.filter(j => checkedIds.has(normUrl(j.url)));
   if (checked.length === 0) { showToast('No jobs checked yet'); return; }
   const headers = ['Title', 'Company', 'Location', 'Region', 'Score', 'Easy Apply', 'Posted', 'Scraped', 'URL'];
   const rows = checked.map(j => [j.title, j.company, j.location, j.region, j.score, j.easy_apply, j.posted, j.scraped_at, j.url]);
@@ -1339,7 +1348,7 @@ function shareApplied() {
   // Build compact payload with timestamps
   const payload = {
     checks: checks.map(url => {
-      const j = JOBS.find(x => x.url === url);
+      const j = JOBS.find(x => normUrl(x.url) === normUrl(url));
       return j ? { t: j.title.slice(0, 40), c: j.company, url } : { url };
     }),
     ts: new Date().toISOString(),
@@ -1377,21 +1386,19 @@ async function renderStats() {
   let ts = serverTimestamps;
   if (Object.keys(ts).length === 0) {
     try {
-      const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-        headers: { 'X-Access-Key': JSONBIN_KEY }
-      });
-      if (r.ok) { const d = await r.json(); ts = d.record?.timestamps || {}; }
+      const record = await fetchJsonBin();
+      if (record) ts = record.timestamps || {};
     } catch(e) {}
   }
 
-  const allApplied = JOBS.filter(j => checkedIds.has(j.url));
+  const allApplied = JOBS.filter(j => checkedIds.has(normUrl(j.url)));
   const cherryApplied = allApplied.filter(j => !j.easy_apply);  // Cherry = external only
   const eaApplied = allApplied.filter(j => j.easy_apply);
 
   // Group by date — ONLY count jobs that exist in dashboard AND are external (not Easy Apply)
   const byDate = {};
   Object.entries(ts).forEach(([url, t]) => {
-    const j = JOBS.find(x => x.url === url);
+    const j = JOBS.find(x => normUrl(x.url) === normUrl(url));
     if (!j || j.easy_apply) return; // skip Easy Apply (Peter's) and unknown URLs
     // t can be a string (timestamp) or object ({emailNum: "002"}) — only use strings
     if (typeof t !== 'string') return;
@@ -1568,6 +1575,28 @@ document.addEventListener('keydown', function(e) {
     submitFeedback(el.dataset.url, 'other', el.value);
   } else if (el.classList.contains('fb-ideal-input') && el.dataset.url) {
     submitFeedback(el.dataset.url, 'ideal', el.value);
+  }
+});
+
+// ─── Force sync on tab close (prevents losing changes within 2s debounce window) ───
+window.addEventListener('beforeunload', () => {
+  if (syncTimeout) {
+    clearTimeout(syncTimeout);
+    syncTimeout = null;
+    // Use synchronous XHR for reliable delivery during page unload (sendBeacon can't set auth headers)
+    const now = new Date().toISOString();
+    checkedIds.forEach(url => {
+      const n = normUrl(url);
+      if (!serverTimestamps[n]) serverTimestamps[n] = now;
+    });
+    const payload = { urls: [...checkedIds].map(normUrl), timestamps: serverTimestamps, feedback: feedbackData, last_updated: now };
+    if (validateSyncPayload(payload)) {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, false); // synchronous
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('X-Access-Key', JSONBIN_KEY);
+      try { xhr.send(JSON.stringify(payload)); } catch(e) {}
+    }
   }
 });
 
