@@ -1415,9 +1415,10 @@ async function renderStats() {
   Object.entries(ts).forEach(([url, t]) => {
     const j = JOBS.find(x => normUrl(x.url) === normUrl(url));
     if (!j || j.easy_apply) return; // skip Easy Apply (Peter's) and unknown URLs
-    // t can be a string (timestamp) or object ({emailNum: "002"}) — only use strings
-    if (typeof t !== 'string') return;
-    const day = t.slice(0, 10);
+    // t can be a string (timestamp) or object ({emailNum: "002", ts: "2026-04-01T..."})
+    const dateStr = typeof t === 'string' ? t : (t && t.ts ? t.ts : null);
+    if (!dateStr) return;
+    const day = dateStr.slice(0, 10);
     byDate[day] = (byDate[day] || 0) + 1;
   });
   const sortedDays = Object.keys(byDate).sort().reverse();
@@ -1479,14 +1480,15 @@ async function renderStats() {
     return parts[parts.length - 1]?.replace(/-/g, ' ')?.slice(0, 50) || url.slice(0, 50);
   }
   const recentApplied = Object.entries(ts)
-    .filter(([url, t]) => { if (typeof t !== 'string') return false; const j = JOBS.find(x => x.url === normUrl(url)); return !j || !j.easy_apply; })
-    .sort((a, b) => b[1].localeCompare(a[1]))
+    .filter(([url, t]) => { const ds = typeof t === 'string' ? t : (t && t.ts ? t.ts : null); if (!ds) return false; const j = JOBS.find(x => x.url === normUrl(url)); return !j || !j.easy_apply; })
+    .sort((a, b) => { const ta = typeof a[1] === 'string' ? a[1] : (a[1]?.ts || ''); const tb = typeof b[1] === 'string' ? b[1] : (b[1]?.ts || ''); return tb.localeCompare(ta); })
     .slice(0, 10)
     .map(([url, t]) => {
       const j = JOBS.find(x => x.url === normUrl(url));
       const fixedUrl = fixJobUrl(url);
       const name = j ? `${j.title.slice(0, 40)} — ${j.company}` : extractJobTitle(url);
-      const ago = timeAgo(t);
+      const dateStr = typeof t === 'string' ? t : (t && t.ts ? t.ts : '');
+      const ago = timeAgo(dateStr);
       const safeHref = escUrl(fixedUrl) || '#';
       return `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f0f0f0;">
         <a href="${safeHref}" target="_blank" rel="noopener" style="color:var(--text); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(fixedUrl)}">${esc(name)}</a>
