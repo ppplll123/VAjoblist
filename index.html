@@ -636,6 +636,7 @@ body {
     <span onclick="sortBy('score')">Score</span>
     <span onclick="sortBy('easy_apply')">Type</span>
   </div>
+  <div id="jobs-loading" style="text-align:center; padding:60px 20px; color:var(--text2); font-family:'DM Mono',monospace; font-size:14px;">Loading job data...</div>
   <div id="jobs"></div>
 </div>
 
@@ -783,7 +784,11 @@ async function loadFromServer() {
       if (!feedbackData[url]) { feedbackData[url] = fb; changed = true; }
     });
     if (changed) { saveLocal(); saveFeedbackLocal(); render(); }
-  } catch(e) { /* offline is fine, localStorage has backup */ }
+    _serverLoaded = true;  // server state loaded — syncToServer is now safe
+  } catch(e) {
+    // offline is fine, localStorage has backup — but also allow syncing
+    _serverLoaded = true;
+  }
 }
 
 function saveLocal() {
@@ -798,8 +803,11 @@ function saveChecks() {
 }
 
 let serverTimestamps = {};  // preserved across syncs
+let _serverLoaded = false;  // gate: skip syncToServer until loadFromServer completes
 
 async function syncToServer() {
+  // Don't sync until server state has been loaded (prevents stale pre-marks from overwriting live state)
+  if (!_serverLoaded) return;
   try {
     // First read existing timestamps so we don't overwrite them
     if (Object.keys(serverTimestamps).length === 0) {
@@ -939,6 +947,9 @@ function showOtherInput(btn, url) {
 // Auto-mark jobs from companies we applied to (baked into JS from Gmail sync)
 function prefillEasyApply() {
   // Auto-mark jobs with applied:true flag (baked in from Gmail sync during build)
+  // Save to localStorage (saveLocal) so counts display immediately,
+  // but do NOT sync to server (syncToServer) — that waits for _serverLoaded flag
+  // to prevent stale build-time marks from overwriting live JSONBin state.
   let count = 0;
   JOBS.forEach(j => {
     if (j.applied && !checkedIds.has(normUrl(j.url))) {
@@ -946,7 +957,7 @@ function prefillEasyApply() {
       count++;
     }
   });
-  if (count) saveChecks();
+  if (count) saveLocal();
 }
 
 // One-time migration: clear EA jobs that were auto-checked by the old prefillEasyApply()
@@ -1037,10 +1048,9 @@ function getFilteredJobs() {
     if (va > vb) return sortAsc ? 1 : -1;
     return 0;
   }).filter((j, i, arr) => {
-    // Max 2 Revolut/Kraken jobs in New and Top tabs (sorted by score, so top 2 kept)
+    // Max 2 jobs per company in New and Top tabs (sorted by score, so top 2 kept)
     if (currentTab !== 'new' && currentTab !== 'top') return true;
     const co = (j.company || '').toLowerCase();
-    if (co !== 'revolut' && co !== 'kraken') return true;
     const prev = arr.slice(0, i).filter(p => (p.company || '').toLowerCase() === co).length;
     return prev < 2;
   });
@@ -1048,6 +1058,10 @@ function getFilteredJobs() {
 
 // ─── Render ───
 function render() {
+  // Hide loading indicator once render is called (data loaded successfully)
+  const _loadingEl = document.getElementById('jobs-loading');
+  if (_loadingEl) _loadingEl.style.display = 'none';
+
   const container = document.getElementById('jobs');
   const statsPanel = document.getElementById('stats-panel');
 
@@ -1158,13 +1172,14 @@ function render() {
               // Show unique email for Cherry to copy when applying
               if (currentTab === 'easy_apply') return '';
               let emailNum = getEmailForJob(j.url);
-              if (!emailNum) {
+              if (!emailNum && _serverLoaded) {
                 emailNum = getNextEmailNumber();
                 const nurl = normUrl(j.url);
                 if (!serverTimestamps[nurl]) serverTimestamps[nurl] = {};
                 serverTimestamps[nurl].emailNum = emailNum;
                 window._emailsAssigned = true;
               }
+              if (!emailNum) return '';  // skip email display until JSONBin loads
               const email = generateEmail(emailNum);
               return `<div style="font-size:10px; color:#1565c0; margin-top:1px; cursor:pointer; user-select:all; font-family:'DM Mono',monospace;" title="Click to copy" data-action="copy-email" data-email="${esc(email)}">📧 ${esc(email)}</div>`;
             })()}
@@ -1201,7 +1216,7 @@ function render() {
     // Batch-sync email assignments to JSONBin (once after all rows rendered)
     if (window._emailsAssigned) {
       window._emailsAssigned = false;
-      debouncedSync();
+      clearTimeout(syncTimeout); syncTimeout = setTimeout(syncToServer, 2000);
     }
   }
   updateStats();
@@ -1612,6 +1627,15 @@ loadFeedbackLocal();
     await new Promise(r => setTimeout(r, 1000));
   }
 })();
+</script>
+<script>
+// Global error handler: show failure message if jobs-data.js fails to load/parse
+window.addEventListener('error', function(e) {
+  if (e.filename && e.filename.indexOf('jobs-data.js') !== -1) {
+    var el = document.getElementById('jobs-loading');
+    if (el) { el.textContent = 'Failed to load job data'; el.style.color = '#c0392b'; el.style.display = 'block'; }
+  }
+}, true);
 </script>
 <script src="jobs-data.js?v=20260330b"></script>
 </body>
