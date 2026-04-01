@@ -998,7 +998,7 @@ function isNewJob(j) {
 
 // ─── Filtering ───
 function getFilteredJobs() {
-  return JOBS.filter(j => {
+  let result = JOBS.filter(j => {
     // Tab filter
     const isChecked = checkedIds.has(normUrl(j.url));
     const isNew = isNewJob(j) && !isChecked;
@@ -1047,13 +1047,28 @@ function getFilteredJobs() {
     if (va < vb) return sortAsc ? -1 : 1;
     if (va > vb) return sortAsc ? 1 : -1;
     return 0;
-  }).filter((j, i, arr) => {
-    // Max 2 jobs per company in New and Top tabs (sorted by score, so top 2 kept)
-    if (currentTab !== 'new' && currentTab !== 'top') return true;
-    const co = (j.company || '').toLowerCase();
-    const prev = arr.slice(0, i).filter(p => (p.company || '').toLowerCase() === co).length;
-    return prev < 2;
   });
+
+  // Max 2 jobs per company in New and Top tabs (sorted by score, so top 2 kept)
+  // Also track how many were hidden per company for the "(+N more)" indicator
+  window._companyHiddenCounts = {};
+  if (currentTab === 'new' || currentTab === 'top') {
+    const companyCounts = {};
+    const totalPerCompany = {};
+    result.forEach(j => {
+      const co = (j.company || '').toLowerCase();
+      totalPerCompany[co] = (totalPerCompany[co] || 0) + 1;
+    });
+    Object.keys(totalPerCompany).forEach(co => {
+      if (totalPerCompany[co] > 2) window._companyHiddenCounts[co] = totalPerCompany[co] - 2;
+    });
+    result = result.filter(j => {
+      const co = (j.company || '').toLowerCase();
+      companyCounts[co] = (companyCounts[co] || 0) + 1;
+      return companyCounts[co] <= 2;
+    });
+  }
+  return result;
 }
 
 // ─── Render ───
@@ -1149,6 +1164,8 @@ function render() {
       const rejBadge = rej ? `<span class="rejected-reason">${rejLabel}</span>` : '';
       const posted = j.posted || '';
       const relPosted = posted ? relativeDate(posted) : '';
+      const hiddenCount = window._companyHiddenCounts[(j.company || '').toLowerCase()] || 0;
+      const companyMoreTag = hiddenCount > 0 ? ` <span style="font-size:10px;color:#999;font-weight:400;">(+${hiddenCount} more)</span>` : '';
       const meta = [j.company, j.salary, posted].filter(Boolean).join(' \u2022 ');
       const mobileScore = j.score > 0 ? `<b class="${scoreClass}">${j.score.toFixed(2)}</b>` : '';
       const mobileTags = `<span class="mobile-tags"><span class="region-tag ${regionClass}">${j.region}</span>${mobileScore}${typeLabel}</span>`;
@@ -1183,7 +1200,7 @@ function render() {
               const email = generateEmail(emailNum);
               return `<div style="font-size:10px; color:#1565c0; margin-top:1px; cursor:pointer; user-select:all; font-family:'DM Mono',monospace;" title="Click to copy" data-action="copy-email" data-email="${esc(email)}">📧 ${esc(email)}</div>`;
             })()}
-            <div class="job-meta">${esc(meta)}${mobileTags}</div>
+            <div class="job-meta">${esc(meta)}${companyMoreTag}${mobileTags}</div>
             ${j.ai_reasoning || j.company_size ? `<div style="font-size:11px; color:#888; margin-top:2px; font-style:italic; line-height:1.3;">${j.work_mode && j.work_mode !== 'unknown' ? `<span style="background:${j.work_mode === 'remote' ? '#e8f5e9' : j.work_mode === 'hybrid' ? '#fff3e0' : '#fde8e8'};color:${j.work_mode === 'remote' ? '#2e7d32' : j.work_mode === 'hybrid' ? '#e65100' : '#c62828'};padding:1px 4px;border-radius:3px;font-size:9px;font-weight:600;font-style:normal;margin-right:4px;">${j.work_mode.toUpperCase()}</span>` : ''}${j.company_size || j.company_hq || j.company_founded ? `<span style="background:#e3f2fd;color:#1565c0;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:600;font-style:normal;margin-right:4px;">ca. ${j.staff_count || j.company_size || '?'} staff${j.company_hq ? ', hq: ' + j.company_hq : ''}${j.company_founded ? ', ' + j.company_founded : ''}${j.company_industries ? ', ' + j.company_industries : ''}</span>` : ''}${j.ai_reasoning ? esc(j.ai_reasoning) : ''}</div>` : ''}
           </div>
           <div class="job-posted">${relPosted}</div>
