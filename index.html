@@ -700,7 +700,7 @@ window.addEventListener('hashchange', () => { loadFromHash(); render(); });
 // To create: GitHub Settings > Developer settings > Fine-grained personal access tokens
 //   → Token name: "dashboard-gist-sync" → Permissions: Gists (read/write) → Generate
 // The token can ONLY access gists — no repo, no user, no org access.
-const GIST_PAT = '***REDACTED-GH-FINE-2026-05-13***';
+const GIST_PAT = '***REDACTED-GH-CLASSIC-2026-05-13***';
 const GIST_ID = 'ffe54eb5a9301fcb7642b7f574c1f854';
 const GIST_RAW_URL = `https://gist.githubusercontent.com/ppplll123/${GIST_ID}/raw/applied_data.json`;
 let syncTimeout = null;
