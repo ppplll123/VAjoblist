@@ -1006,8 +1006,8 @@ function getFilteredJobs() {
     if (currentTab === 'professor' && !isProf) return false;                     // Professor/academic positions only
     if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;        // Jobs posted in last 24hrs, score ≥ 0.9, external only
     if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
-    if (currentTab === 'easy_apply' && !isEA) return false;                    // All Easy Apply jobs (Peter) — checked shown crossed out at bottom
-    if (currentTab === 'applied' && (!isChecked || isEA)) return false;        // Cherry applied only (external, not EA)
+    if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;      // Unapplied Easy Apply jobs only
+    if (currentTab === 'applied' && !isChecked) return false;                  // All applied jobs (Cherry external + Peter EA)
     if (currentTab === 'browse' && (isTop || isChecked || isEA)) return false; // Lower score unchecked external jobs
     // 'all' shows everything
 
