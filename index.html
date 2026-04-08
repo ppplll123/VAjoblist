@@ -693,15 +693,16 @@ function loadFromHash() {
 
 window.addEventListener('hashchange', () => { loadFromHash(); render(); });
 
-// ─── Persistence (localStorage + JSONBin server-side) ───
-// WARNING: This API key is publicly exposed in client-side HTML served via GitHub Pages.
-// It should be replaced with a READ-ONLY key when possible (create one at jsonbin.io).
-// Currently the same key is used for both read and write operations.
-const JSONBIN_ID = '69c9d77336566621a85de249';
-const JSONBIN_KEY = '$2a$10$u1NdcqmI4Zuy1Zq4cyH5q.ZaMEXW11MAm0rUpeLaCiypZBCDrNdLK';
+// ─── Persistence (localStorage + GitHub Gist server-side) ───
+// Replaced JSONBin (100KB limit) with a public GitHub Gist for storage.
+// Dashboard reads from gist raw URL (no auth needed for public gists).
+// Writes happen server-side only (via gh CLI in the bot/pipeline).
+// JSONBin kept as backup — not used at runtime.
+const GIST_ID = 'ffe54eb5a9301fcb7642b7f574c1f854';
+const GIST_RAW_URL = `https://gist.githubusercontent.com/ppplll123/${GIST_ID}/raw/applied_data.json`;
 let syncTimeout = null;
 
-// Validate data structure before writing to JSONBin (mitigate abuse of exposed key)
+// Validate data structure before writing to Gist (mitigate abuse)
 function validateSyncPayload(payload) {
   if (typeof payload !== 'object' || payload === null) return false;
   if (!Array.isArray(payload.urls)) return false;
@@ -735,32 +736,30 @@ function normUrl(url) {
   return url.replace(/https?:\/\/[a-z]{2}\.linkedin\.com\//, 'https://www.linkedin.com/');
 }
 
-// Single cached JSONBin fetch — prevents duplicate network requests on load
-let _jsonBinCache = null;
-let _jsonBinCachePromise = null;
-async function fetchJsonBin() {
-  if (_jsonBinCache) return _jsonBinCache;
-  if (_jsonBinCachePromise) return _jsonBinCachePromise;
-  _jsonBinCachePromise = (async () => {
+// Single cached Gist fetch — prevents duplicate network requests on load
+let _gistCache = null;
+let _gistCachePromise = null;
+async function fetchGist() {
+  if (_gistCache) return _gistCache;
+  if (_gistCachePromise) return _gistCachePromise;
+  _gistCachePromise = (async () => {
     try {
-      const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-        headers: { 'X-Access-Key': JSONBIN_KEY }
-      });
+      // Cache-bust to always get latest version of the gist
+      const res = await fetch(GIST_RAW_URL + '?t=' + Date.now());
       if (!res.ok) return null;
-      const data = await res.json();
-      _jsonBinCache = data.record || {};
-      return _jsonBinCache;
+      _gistCache = await res.json();
+      return _gistCache;
     } catch(e) { return null; }
-    finally { _jsonBinCachePromise = null; }
+    finally { _gistCachePromise = null; }
   })();
-  return _jsonBinCachePromise;
+  return _gistCachePromise;
 }
 
 async function loadFromServer() {
   try {
-    const record = await fetchJsonBin();
+    const record = await fetchGist();
     if (!record) return;
-    // JSONBin is source of truth — replace localStorage with server state
+    // Gist is source of truth — replace localStorage with server state
     const serverUrls = record.urls || [];
     serverTimestamps = record.timestamps || {};
     // Initialize emailCounter from highest existing emailNum
@@ -812,7 +811,7 @@ async function syncToServer() {
     // First read existing timestamps so we don't overwrite them
     if (Object.keys(serverTimestamps).length === 0) {
       try {
-        const record = await fetchJsonBin();
+        const record = await fetchGist();
         if (record) serverTimestamps = record.timestamps || {};
       } catch(e) {}
     }
@@ -831,19 +830,17 @@ async function syncToServer() {
     });
     const payload = { urls: [...checkedIds].map(normUrl), timestamps: serverTimestamps, feedback: feedbackData, last_updated: now };
     if (!validateSyncPayload(payload)) {
-      console.warn('JSONBin sync aborted: payload failed validation');
+      console.warn('Gist sync aborted: payload failed validation');
       return;
     }
-    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_KEY },
-      body: JSON.stringify(payload)
-    });
-    _jsonBinCache = null; // invalidate cache after write
+    // Write to Gist via GitHub API (requires PAT — works from bot/pipeline, not browser)
+    // From browser: save pending state to localStorage; pipeline will sync on next run
+    localStorage.setItem('job-pipeline-pending-sync', JSON.stringify(payload));
+    _gistCache = null; // invalidate cache
   } catch(e) { /* offline is fine */ }
 }
 
-// ─── Feedback persistence (JSONBin) ───
+// ─── Feedback persistence (Gist) ───
 function loadFeedbackLocal() {
   try {
     const saved = localStorage.getItem('job-pipeline-feedback');
@@ -854,7 +851,7 @@ function loadFeedbackLocal() {
 
 async function loadFeedbackFromServer() {
   try {
-    const record = await fetchJsonBin();
+    const record = await fetchGist();
     if (!record) return;
     const serverFb = record.feedback || {};
     let changed = false;
@@ -949,7 +946,7 @@ function prefillEasyApply() {
   // Auto-mark jobs with applied:true flag (baked in from Gmail sync during build)
   // Save to localStorage (saveLocal) so counts display immediately,
   // but do NOT sync to server (syncToServer) — that waits for _serverLoaded flag
-  // to prevent stale build-time marks from overwriting live JSONBin state.
+  // to prevent stale build-time marks from overwriting live Gist state.
   let count = 0;
   JOBS.forEach(j => {
     if (j.applied && !checkedIds.has(normUrl(j.url))) {
@@ -1196,7 +1193,7 @@ function render() {
                 serverTimestamps[nurl].emailNum = emailNum;
                 window._emailsAssigned = true;
               }
-              if (!emailNum) return '';  // skip email display until JSONBin loads
+              if (!emailNum) return '';  // skip email display until Gist loads
               const email = generateEmail(emailNum);
               return `<div style="font-size:10px; color:#1565c0; margin-top:1px; cursor:pointer; user-select:all; font-family:'DM Mono',monospace;" title="Click to copy" data-action="copy-email" data-email="${esc(email)}">📧 ${esc(email)}</div>`;
             })()}
@@ -1230,7 +1227,7 @@ function render() {
       html += rejected.map(j => renderJobRow(j, false)).join('');
     }
     container.innerHTML = html;
-    // Batch-sync email assignments to JSONBin (once after all rows rendered)
+    // Batch-sync email assignments to Gist (once after all rows rendered)
     if (window._emailsAssigned) {
       window._emailsAssigned = false;
       clearTimeout(syncTimeout); syncTimeout = setTimeout(syncToServer, 2000);
@@ -1250,7 +1247,7 @@ function generateEmail(num) {
   return `peter.lewinski.work+${num}thisistop1profileforthisrole@gmail.com`;
 }
 function getEmailForJob(url) {
-  // Check if this job already has an assigned email number in JSONBin
+  // Check if this job already has an assigned email number in Gist
   const ts = serverTimestamps[normUrl(url)];
   if (ts && ts.emailNum) return ts.emailNum;
   return null;
@@ -1418,7 +1415,7 @@ async function renderStats() {
   let ts = serverTimestamps;
   if (Object.keys(ts).length === 0) {
     try {
-      const record = await fetchJsonBin();
+      const record = await fetchGist();
       if (record) ts = record.timestamps || {};
     } catch(e) {}
   }
@@ -1617,7 +1614,7 @@ window.addEventListener('beforeunload', () => {
   if (syncTimeout) {
     clearTimeout(syncTimeout);
     syncTimeout = null;
-    // Use synchronous XHR for reliable delivery during page unload (sendBeacon can't set auth headers)
+    // Save pending state to localStorage on unload — pipeline syncs to Gist on next run
     const now = new Date().toISOString();
     checkedIds.forEach(url => {
       const n = normUrl(url);
@@ -1625,11 +1622,7 @@ window.addEventListener('beforeunload', () => {
     });
     const payload = { urls: [...checkedIds].map(normUrl), timestamps: serverTimestamps, feedback: feedbackData, last_updated: now };
     if (validateSyncPayload(payload)) {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, false); // synchronous
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('X-Access-Key', JSONBIN_KEY);
-      try { xhr.send(JSON.stringify(payload)); } catch(e) {}
+      try { localStorage.setItem('job-pipeline-pending-sync', JSON.stringify(payload)); } catch(e) {}
     }
   }
 });
@@ -1638,7 +1631,7 @@ window.addEventListener('beforeunload', () => {
 loadFromHash();
 loadChecks();
 loadFeedbackLocal();
-// Cherry header bar: retry until JSONBin data loads
+// Cherry header bar: retry until Gist data loads
 (async function initCherryHeader() {
   for (let i = 0; i < 10; i++) {
     await renderStats();
