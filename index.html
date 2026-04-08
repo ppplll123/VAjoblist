@@ -693,11 +693,14 @@ function loadFromHash() {
 
 window.addEventListener('hashchange', () => { loadFromHash(); render(); });
 
-// ─── Persistence (localStorage + GitHub Gist server-side) ───
+// ─── Persistence (localStorage + GitHub Gist) ───
 // Replaced JSONBin (100KB limit) with a public GitHub Gist for storage.
 // Dashboard reads from gist raw URL (no auth needed for public gists).
-// Writes happen server-side only (via gh CLI in the bot/pipeline).
-// JSONBin kept as backup — not used at runtime.
+// Writes use a gist-scoped PAT (fine-grained token with ONLY gist read/write).
+// To create: GitHub Settings > Developer settings > Fine-grained personal access tokens
+//   → Token name: "dashboard-gist-sync" → Permissions: Gists (read/write) → Generate
+// The token can ONLY access gists — no repo, no user, no org access.
+const GIST_PAT = '***REDACTED-GH-FINE-2026-05-13***';
 const GIST_ID = 'ffe54eb5a9301fcb7642b7f574c1f854';
 const GIST_RAW_URL = `https://gist.githubusercontent.com/ppplll123/${GIST_ID}/raw/applied_data.json`;
 let syncTimeout = null;
@@ -833,9 +836,32 @@ async function syncToServer() {
       console.warn('Gist sync aborted: payload failed validation');
       return;
     }
-    // Write to Gist via GitHub API (requires PAT — works from bot/pipeline, not browser)
-    // From browser: save pending state to localStorage; pipeline will sync on next run
+    // Always save to localStorage as offline fallback
     localStorage.setItem('job-pipeline-pending-sync', JSON.stringify(payload));
+    // Write directly to Gist via GitHub API if PAT is configured
+    if (GIST_PAT && !GIST_PAT.includes('PLACEHOLDER')) {
+      try {
+        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `token ${GIST_PAT}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            files: { 'applied_data.json': { content: JSON.stringify(payload, null, 2) } }
+          })
+        });
+        if (res.ok) {
+          console.log('Gist synced successfully');
+          localStorage.removeItem('job-pipeline-pending-sync');
+        } else {
+          console.warn('Gist sync failed:', res.status, await res.text());
+        }
+      } catch(e) {
+        console.warn('Gist sync error (offline?):', e.message);
+      }
+    }
     _gistCache = null; // invalidate cache
   } catch(e) { /* offline is fine */ }
 }
