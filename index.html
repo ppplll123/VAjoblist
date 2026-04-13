@@ -819,10 +819,18 @@ async function syncToServer() {
       } catch(e) {}
     }
     // Only set timestamp for NEW clicks (not already tracked), normalize URLs
+    // Also fix legacy numeric timestamps and objects missing ts field
     const now = new Date().toISOString();
     checkedIds.forEach(url => {
       const n = normUrl(url);
-      if (!serverTimestamps[n]) serverTimestamps[n] = now;
+      if (!serverTimestamps[n]) {
+        serverTimestamps[n] = now;
+      } else if (typeof serverTimestamps[n] === 'number') {
+        serverTimestamps[n] = new Date(serverTimestamps[n]).toISOString();
+      } else if (typeof serverTimestamps[n] === 'object' && serverTimestamps[n] !== null) {
+        if (!serverTimestamps[n].ts) serverTimestamps[n].ts = now;
+        else if (typeof serverTimestamps[n].ts === 'number') serverTimestamps[n].ts = new Date(serverTimestamps[n].ts).toISOString();
+      }
     });
     // Remove unchecked URLs from timestamps — but keep emailNum entries (they persist independently)
     Object.keys(serverTimestamps).forEach(url => {
@@ -1215,7 +1223,8 @@ function render() {
               if (!emailNum && _serverLoaded) {
                 emailNum = getNextEmailNumber();
                 const nurl = normUrl(j.url);
-                if (!serverTimestamps[nurl]) serverTimestamps[nurl] = {};
+                if (!serverTimestamps[nurl]) serverTimestamps[nurl] = { ts: new Date().toISOString() };
+                if (!serverTimestamps[nurl].ts) serverTimestamps[nurl].ts = new Date().toISOString();
                 serverTimestamps[nurl].emailNum = emailNum;
                 window._emailsAssigned = true;
               }
@@ -1312,10 +1321,13 @@ function toggleCheck(e, url) {
     // Assign email number when checking (applying)
     if (!serverTimestamps[nUrl] || !serverTimestamps[nUrl].emailNum) {
       const num = getNextEmailNumber();
-      if (!serverTimestamps[nUrl]) serverTimestamps[nUrl] = Date.now();
-      if (typeof serverTimestamps[nUrl] === 'number') {
+      if (!serverTimestamps[nUrl]) serverTimestamps[nUrl] = new Date().toISOString();
+      if (typeof serverTimestamps[nUrl] === 'string') {
         serverTimestamps[nUrl] = { ts: serverTimestamps[nUrl], emailNum: num };
+      } else if (typeof serverTimestamps[nUrl] === 'number') {
+        serverTimestamps[nUrl] = { ts: new Date(serverTimestamps[nUrl]).toISOString(), emailNum: num };
       } else {
+        if (!serverTimestamps[nUrl].ts) serverTimestamps[nUrl].ts = new Date().toISOString();
         serverTimestamps[nUrl].emailNum = num;
       }
     }
@@ -1455,9 +1467,10 @@ async function renderStats() {
   Object.entries(ts).forEach(([url, t]) => {
     const j = JOBS.find(x => normUrl(x.url) === normUrl(url));
     if (!j || j.easy_apply) return; // skip Easy Apply (Peter's) and unknown URLs
-    // t can be a string (timestamp) or object ({emailNum: "002", ts: "2026-04-01T..."})
-    const dateStr = typeof t === 'string' ? t : (t && t.ts ? t.ts : null);
-    if (!dateStr) return;
+    // t can be a string (ISO timestamp), number (Date.now() ms), or object ({emailNum: "002", ts: "2026-04-01T..."})
+    let dateStr = typeof t === 'string' ? t : (t && t.ts ? t.ts : null);
+    if (typeof dateStr === 'number') dateStr = new Date(dateStr).toISOString();
+    if (!dateStr || typeof dateStr !== 'string') return;
     const day = dateStr.slice(0, 10);
     byDate[day] = (byDate[day] || 0) + 1;
   });
@@ -1644,7 +1657,13 @@ window.addEventListener('beforeunload', () => {
     const now = new Date().toISOString();
     checkedIds.forEach(url => {
       const n = normUrl(url);
-      if (!serverTimestamps[n]) serverTimestamps[n] = now;
+      if (!serverTimestamps[n]) {
+        serverTimestamps[n] = now;
+      } else if (typeof serverTimestamps[n] === 'number') {
+        serverTimestamps[n] = new Date(serverTimestamps[n]).toISOString();
+      } else if (typeof serverTimestamps[n] === 'object' && serverTimestamps[n] !== null && !serverTimestamps[n].ts) {
+        serverTimestamps[n].ts = now;
+      }
     });
     const payload = { urls: [...checkedIds].map(normUrl), timestamps: serverTimestamps, feedback: feedbackData, last_updated: now };
     if (validateSyncPayload(payload)) {
