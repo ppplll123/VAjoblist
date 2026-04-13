@@ -1037,7 +1037,7 @@ function getFilteredJobs() {
     const isTop = j.score >= 0.9;
 
     const isProf = /\b(professor|lecturer|faculty|academic)\b/i.test(j.title);
-    if (currentTab === 'professor' && !isProf) return false;                     // Professor/academic positions only
+    if (currentTab === 'professor' && (!isProf || isChecked)) return false;       // Unapplied professor/academic positions only
     if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;        // Jobs posted in last 24hrs, score ≥ 0.9, external only
     if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
     if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;      // Unapplied Easy Apply jobs only
@@ -1354,7 +1354,7 @@ function updateStats() {
   document.getElementById('tab-top-count').textContent = topJobs.length;
   document.getElementById('tab-ea-count').textContent = allEA.length;
   document.getElementById('tab-applied-count').textContent = cherryApplied.length;
-  const profJobs = JOBS.filter(j => /\b(professor|lecturer|faculty|academic)\b/i.test(j.title));
+  const profJobs = JOBS.filter(j => /\b(professor|lecturer|faculty|academic)\b/i.test(j.title) && !checkedIds.has(normUrl(j.url)));
   document.getElementById('tab-browse-count').textContent = browse.length;
   document.getElementById('tab-all-count').textContent = JOBS.length;
   document.getElementById('tab-prof-count').textContent = profJobs.length;
