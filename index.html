@@ -1033,7 +1033,7 @@ function isNewJob(j) {
 let _filteredCache = null;
 let _filteredKey = "";
 function _filterKey() {
-  return `${currentTab}|${currentFilter}|${currentSearch}|${sortField}|${sortDir}|${checkedIds.size}|${JOBS.length}`;
+  return `${currentTab}|${currentFilter}|${currentSearch}|${sortField}|${sortAsc}|${checkedIds.size}|${JOBS.length}`;
 }
 function getFilteredJobs() {
   const key = _filterKey();
