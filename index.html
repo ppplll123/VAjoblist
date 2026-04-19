@@ -1270,12 +1270,28 @@ function render() {
       return html;
     };
 
-    let html = nonRejected.map(j => renderJobRow(j, showFeedbackBtns)).join('');
+    // Hard cap rendered rows for perf (GPT-5.4 + Gemini perf review)
+    // Render first 200 rows, "Load more" reveals next 200 etc.
+    const RENDER_CAP = 200;
+    const renderLimit = (window._renderLimit || RENDER_CAP);
+    const visibleNonRej = nonRejected.slice(0, renderLimit);
+    const remaining = Math.max(0, nonRejected.length - visibleNonRej.length);
+    let html = visibleNonRej.map(j => renderJobRow(j, showFeedbackBtns)).join('');
+    if (remaining > 0) {
+      html += `<div style="text-align:center; padding:20px;"><button id="load-more-btn" class="btn" style="padding:10px 24px; background:#0a66c2; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:600;">Load ${Math.min(RENDER_CAP, remaining)} more (${remaining} hidden)</button></div>`;
+    }
     if (rejected.length > 0) {
       html += `<div class="section-divider">Rejected <span class="line"></span> ${rejected.length}</div>`;
-      html += rejected.map(j => renderJobRow(j, false)).join('');
+      html += rejected.slice(0, 100).map(j => renderJobRow(j, false)).join('');
     }
     container.innerHTML = html;
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    if (loadMoreBtn) {
+      loadMoreBtn.addEventListener('click', () => {
+        window._renderLimit = (window._renderLimit || RENDER_CAP) + RENDER_CAP;
+        render();
+      });
+    }
     // Batch-sync email assignments to Gist (once after all rows rendered)
     if (window._emailsAssigned) {
       window._emailsAssigned = false;
@@ -1594,6 +1610,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentTab = btn.dataset.tab;
+    window._renderLimit = 200;  // reset paging on tab change
     // Default sort: New/Top by posted date (newest first), others by score
     if (currentTab === 'new' || currentTab === 'top') {
       sortField = 'posted'; sortAsc = false;
@@ -1611,6 +1628,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
+    window._renderLimit = 200;  // reset paging on filter change
     updateHash();
     render();
   });
@@ -1620,6 +1638,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 let _searchTimer = null;
 document.getElementById('search').addEventListener('input', e => {
   currentSearch = e.target.value;
+  window._renderLimit = 200;  // reset paging on search
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(() => {
     updateHash();
