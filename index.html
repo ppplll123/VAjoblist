@@ -1028,7 +1028,21 @@ function isNewJob(j) {
 }
 
 // ─── Filtering ───
+// Memoize getFilteredJobs — avoids rerunning expensive filter+sort on every render
+// (Gemini perf review: was running 6+ JOBS.filter passes per render = 140k iterations)
+let _filteredCache = null;
+let _filteredKey = "";
+function _filterKey() {
+  return `${currentTab}|${currentFilter}|${currentSearch}|${sortField}|${sortDir}|${checkedIds.size}|${JOBS.length}`;
+}
 function getFilteredJobs() {
+  const key = _filterKey();
+  if (key === _filteredKey && _filteredCache) return _filteredCache;
+  _filteredKey = key;
+  _filteredCache = _computeFilteredJobs();
+  return _filteredCache;
+}
+function _computeFilteredJobs() {
   let result = JOBS.filter(j => {
     // Tab filter
     const isChecked = checkedIds.has(normUrl(j.url));
@@ -1602,11 +1616,15 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 
-// Search
+// Search (debounced — was firing render on every keystroke, crashing browser)
+let _searchTimer = null;
 document.getElementById('search').addEventListener('input', e => {
   currentSearch = e.target.value;
-  updateHash();
-  render();
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => {
+    updateHash();
+    render();
+  }, 250);
 });
 
 // Keyboard
