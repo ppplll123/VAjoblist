@@ -847,7 +847,7 @@ async function syncToServer() {
     // Always save to localStorage as offline fallback
     localStorage.setItem('job-pipeline-pending-sync', JSON.stringify(payload));
     // Write directly to Gist via GitHub API if PAT is configured
-    if (GIST_PAT && !GIST_PAT.includes('PLACEHOLDER')) {
+    if (GIST_PAT && !GIST_PAT.includes('INJECTED_AT_DEPLOY') && !GIST_PAT.includes('PLACEHOLDER')) {
       try {
         const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
           method: 'PATCH',
