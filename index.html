@@ -1049,10 +1049,11 @@ function _computeFilteredJobs() {
     const isNew = isNewJob(j) && !isChecked;
     const isEA = !!j.easy_apply;
     const isTop = j.score >= 0.9;
+    const isTopNew = j.score >= 0.80;
 
     const isProf = /\b(professor|lecturer|faculty|academic)\b/i.test(j.title);
     if (currentTab === 'professor' && (!isProf || isChecked)) return false;       // Unapplied professor/academic positions only
-    if (currentTab === 'new' && (!isNew || !isTop || isEA)) return false;        // Jobs posted in last 24hrs, score ≥ 0.9, external only
+    if (currentTab === 'new' && (!isNew || !isTopNew || isEA)) return false;     // Jobs posted in last 24hrs, score ≥ 0.80, external only
     if (currentTab === 'top' && (!isTop || isChecked || isEA)) return false;   // Top external jobs for VA
     if (currentTab === 'easy_apply' && (!isEA || isChecked)) return false;      // Unapplied Easy Apply jobs only
     if (currentTab === 'applied' && !isChecked) return false;                  // All applied jobs (Cherry external + Peter EA)
@@ -1368,7 +1369,7 @@ function toggleCheck(e, url) {
 
 function updateStats() {
   const latestBatch = getLatestBatch();
-  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(normUrl(j.url)) && j.score >= 0.9 && !j.easy_apply);
+  const newJobs = JOBS.filter(j => isNewJob(j) && !checkedIds.has(normUrl(j.url)) && j.score >= 0.80 && !j.easy_apply);
   const topJobs = JOBS.filter(j => j.score >= 0.9 && !checkedIds.has(normUrl(j.url)) && !j.easy_apply);
   const allEA = JOBS.filter(j => j.easy_apply);
   const eaUnchecked = allEA.filter(j => !checkedIds.has(normUrl(j.url)));
