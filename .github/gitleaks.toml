@@ -1,0 +1,102 @@
+# Tightened gitleaks config — extra rules for keys gitleaks default ruleset misses,
+# plus an allowlist for common false-positive patterns we observed in this account
+# (LinkedIn company-name JSON, CSS class names, Slovakia in travel itineraries).
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "openai-project-key"
+description = "OpenAI sk-proj- key"
+regex = '''sk-proj-[A-Za-z0-9_\-]{40,}'''
+keywords = ["sk-proj-"]
+
+[[rules]]
+id = "openai-service-account"
+description = "OpenAI sk-svcacct- key"
+regex = '''sk-svcacct-[A-Za-z0-9_\-]{40,}'''
+keywords = ["sk-svcacct-"]
+
+[[rules]]
+id = "openai-admin"
+description = "OpenAI sk-admin- key"
+regex = '''sk-admin-[A-Za-z0-9_\-]{40,}'''
+keywords = ["sk-admin-"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic sk-ant-api03 key"
+regex = '''sk-ant-api03-[A-Za-z0-9_\-]{40,}'''
+keywords = ["sk-ant-api03"]
+
+[[rules]]
+id = "meta-fb-access-token"
+description = "Meta Graph API EAA-style token"
+regex = '''\bEAA[A-Za-z0-9]{50,}\b|\bEAF[A-Za-z0-9]{50,}\b'''
+keywords = ["EAA", "EAF"]
+
+[[rules]]
+id = "telegram-bot-token"
+description = "Telegram bot token"
+regex = '''\b\d{8,}:[A-Za-z0-9_-]{30,}\b'''
+keywords = [":"]
+
+[[rules]]
+id = "gemini-aq-key"
+description = "Google Gemini AQ. key"
+regex = '''AQ\.[A-Za-z0-9_\-]{40,}'''
+keywords = ["AQ."]
+
+[[rules]]
+id = "fal-ai-key"
+description = "Fal.ai key"
+regex = '''fal_[a-z0-9_]{30,}'''
+keywords = ["fal_"]
+
+[[rules]]
+id = "firecrawl-key"
+description = "Firecrawl API key"
+regex = '''fc-[a-f0-9]{32}'''
+keywords = ["fc-"]
+
+[[rules]]
+id = "apify-token"
+description = "Apify API token"
+regex = '''apify_api_[A-Za-z0-9]{30,}'''
+keywords = ["apify_api_"]
+
+[[rules]]
+id = "github-fine-pat"
+description = "GitHub fine-grained PAT"
+regex = '''github_pat_[A-Za-z0-9_]{50,}'''
+keywords = ["github_pat_"]
+
+# ---------- allowlist (false positives we already triaged) ----------
+
+[allowlist]
+description = "FP allowlist for ppplll123 account"
+paths = [
+  '''.*\.lock$''',
+  '''package-lock\.json$''',
+  '''yarn\.lock$''',
+  '''pnpm-lock\.yaml$''',
+  '''fonts/.*\.ttf$''',
+  '''fonts/.*\.woff2?$''',
+  '''adgm-individuals.*\.(json|txt|md)$''',  # ADGM scraped data
+  '''firms-linkedin-enriched\.json$''',       # LinkedIn enrichment dump
+  '''linkedin-suspects\.json$''',
+  '''competitor-ad-copies\.json$''',
+  '''.*-classified\.md$''',
+  '''apify-people-raw\.json$''',
+]
+regexes = [
+  # "Slovakia / Bratislava" travel-itinerary AKIA false positives
+  '''Slovakia|Bratislava''',
+  # LinkedIn company names that look like keys
+  '''linkedin_name"\s*:\s*"INVESTINDUSTR''',
+  '''linkedin_name"\s*:\s*"SmartRiskAl''',
+  # LinkedIn media URL tokens (look like sk- but aren't)
+  '''media\.licdn\.com/dms/image/''',
+  # CSS class names starting with sk-
+  '''class=["'][^"']*sk-''',
+]
