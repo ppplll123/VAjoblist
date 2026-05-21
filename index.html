@@ -610,6 +610,8 @@ body {
   <button class="filter-btn" data-filter="ashby" style="color:#7b1fa2;">AB</button>
   <button class="filter-btn" data-filter="smartrecruiters" style="color:#00838f;">SR</button>
   <button class="filter-btn" data-filter="amazon" style="color:#f57f17;">AZ</button>
+  <button class="filter-btn" data-filter="bayt" style="color:#8e24aa;">BY</button>
+  <button class="filter-btn" data-filter="naukrigulf" style="color:#00695c;">NG</button>
   <input class="search-box" placeholder="Search title, company..." id="search" />
   <select class="mobile-sort" id="mobile-sort" onchange="mobileSortChange(this.value)">
     <option value="score-desc">Score (high)</option>
@@ -1071,7 +1073,9 @@ function _computeFilteredJobs() {
     if (currentFilter === 'ashby' && j.source !== 'ashby') return false;
     if (currentFilter === 'smartrecruiters' && j.source !== 'smartrecruiters') return false;
     if (currentFilter === 'amazon' && j.source !== 'amazon') return false;
-    if (!['all', 'easy_apply', 'external', 'prof', 'linkedin', 'indeed_mcp', 'jobspy', 'greenhouse', 'lever', 'ashby', 'smartrecruiters', 'amazon'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
+    if (currentFilter === 'bayt' && j.source !== 'bayt') return false;
+    if (currentFilter === 'naukrigulf' && j.source !== 'naukrigulf') return false;
+    if (!['all', 'easy_apply', 'external', 'prof', 'linkedin', 'indeed_mcp', 'jobspy', 'greenhouse', 'lever', 'ashby', 'smartrecruiters', 'amazon', 'bayt', 'naukrigulf'].includes(currentFilter) && j.region.toLowerCase() !== currentFilter) return false;
 
     // Search
     if (currentSearch) {
@@ -1326,8 +1330,13 @@ function escUrl(url) {
 
 function relativeDate(dateStr) {
   if (!dateStr) return '';
+  const s = dateStr.trim();
+  // Pass-through if already a relative string (e.g. Bayt "Yesterday", "14 days ago")
+  if (/ago$|^today$|^yesterday$|^just now$/i.test(s)) return s.toLowerCase();
   const now = new Date();
-  const d = new Date(dateStr + 'T12:00:00Z');
+  // ISO timestamps (Naukrigulf format) — parse directly. YYYY-MM-DD — append noon UTC for stability.
+  const d = /T\d|Z$|\+\d{2}:\d{2}$/.test(s) ? new Date(s) : new Date(s + 'T12:00:00Z');
+  if (isNaN(d.getTime())) return s;
   const diffMs = now - d;
   const diffH = Math.floor(diffMs / 3600000);
   const diffD = Math.floor(diffMs / 86400000);
